@@ -6,7 +6,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { LanguageSelector, type TranslationDirection } from '@/components/LanguageSelector';
 import { TranslationProgress } from '@/components/TranslationProgress';
 import { TranslationResult } from '@/components/TranslationResult';
-import { extractPDFContent, type PDFInfo } from '@/lib/pdf-utils';
+import { extractPDFContent, groupIntoParagraphs, type PDFInfo } from '@/lib/pdf-utils';
 import { exportTranslatedPDF, type TranslatedPage } from '@/lib/pdf-export';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,7 +56,7 @@ const Index = () => {
       setCurrentPage(i + 1);
 
       if (!page.text.trim()) {
-        results.push({ pageNumber: page.pageNumber, originalText: '', translatedText: '' });
+        results.push({ pageNumber: page.pageNumber, originalText: '', translatedText: '', pageWidth: page.width, pageHeight: page.height });
         continue;
       }
 
@@ -68,10 +68,14 @@ const Index = () => {
         if (error) throw error;
 
         const translated = data?.translatedText || '';
+        const paragraphs = groupIntoParagraphs(page.textItems, page.height);
         results.push({
           pageNumber: page.pageNumber,
           originalText: page.text,
           translatedText: translated,
+          pageWidth: page.width,
+          pageHeight: page.height,
+          paragraphs,
         });
         setCurrentPreview(translated);
       } catch (err: any) {
@@ -81,6 +85,8 @@ const Index = () => {
           pageNumber: page.pageNumber,
           originalText: page.text,
           translatedText: `[翻译失败] ${page.text}`,
+          pageWidth: page.width,
+          pageHeight: page.height,
         });
       }
     }
@@ -98,9 +104,10 @@ const Index = () => {
     setCurrentPreview('');
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (translatedPages.length === 0 || !file) return;
-    exportTranslatedPDF(translatedPages, file.name);
+    toast.info('正在生成PDF...');
+    await exportTranslatedPDF(translatedPages, file.name);
     toast.success('PDF已开始下载');
   };
 
