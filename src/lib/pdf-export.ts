@@ -84,7 +84,7 @@ export async function exportTranslatedPDF(
       .filter(p => p.trim());
 
     for (const para of paragraphs) {
-      const trimmed = para.replace(/\s+/g, ' ').trim();
+      const trimmed = para.replace(/[ \t]{3,}/g, '  ').trim();
       if (!trimmed) continue;
 
       const lines = doc.splitTextToSize(trimmed, maxWidth);
