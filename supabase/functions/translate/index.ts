@@ -28,8 +28,8 @@ serve(async (req) => {
 
     const systemPrompt =
       direction === "zh-en"
-        ? "You are a professional translator. Translate the following Chinese text to English. Only return the translated text, nothing else. Preserve paragraph structure."
-        : "You are a professional translator. Translate the following English text to Chinese. Only return the translated text, nothing else. Preserve paragraph structure.";
+        ? "You are a professional translator. Translate the following Chinese text to English. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only."
+        : "You are a professional translator. Translate the following English text to Chinese. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only.";
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -68,8 +68,15 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const translatedText =
+    let translatedText =
       data.choices?.[0]?.message?.content?.trim() || "";
+    // Strip any markdown formatting the model might still produce
+    translatedText = translatedText
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^[-*+]\s+/gm, "")
+      .replace(/`([^`]+)`/g, "$1");
 
     return new Response(
       JSON.stringify({ translatedText }),
