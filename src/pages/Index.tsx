@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Languages } from 'lucide-react';
+import { ApiKeySettings, getStoredApiKey } from '@/components/ApiKeySettings';
 import { Button } from '@/components/ui/button';
 import { FileUpload } from '@/components/FileUpload';
 import { LanguageSelector, type TranslationDirection } from '@/components/LanguageSelector';
@@ -22,6 +23,7 @@ const Index = () => {
   const [currentPreview, setCurrentPreview] = useState('');
   const [translatedPages, setTranslatedPages] = useState<TranslatedPage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasCustomKey, setHasCustomKey] = useState(() => !!getStoredApiKey());
   const cancelRef = useRef(false);
 
   const handleFileSelect = useCallback(async (f: File) => {
@@ -61,8 +63,15 @@ const Index = () => {
       }
 
       try {
+        const keyConfig = getStoredApiKey();
+        const body: Record<string, string> = { text: page.text, direction };
+        if (keyConfig) {
+          body.customApiKey = keyConfig.apiKey;
+          if (keyConfig.baseUrl) body.customBaseUrl = keyConfig.baseUrl;
+        }
+
         const { data, error } = await supabase.functions.invoke('translate', {
-          body: { text: page.text, direction },
+          body,
         });
 
         if (error) throw error;
@@ -124,11 +133,14 @@ const Index = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-            <Languages className="w-5 h-5 text-primary-foreground" />
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+              <Languages className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <h1 className="text-lg font-semibold text-foreground">AI PDF 翻译</h1>
           </div>
-          <h1 className="text-lg font-semibold text-foreground">AI PDF 翻译</h1>
+          <ApiKeySettings onKeyChange={setHasCustomKey} />
         </div>
       </header>
 
@@ -188,6 +200,7 @@ const Index = () => {
               totalPages={pdfInfo?.numPages || 0}
               currentText={currentPreview}
               onCancel={handleCancel}
+              usingCustomKey={hasCustomKey}
             />
           )}
 
