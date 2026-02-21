@@ -219,7 +219,7 @@ function ProviderList({
   );
 }
 
-/* ────── Provider Form (Add/Edit) ────── */
+/* ────── Provider Form (Add/Edit) — DeepLX style ────── */
 function ProviderForm({
   provider,
   onSave,
@@ -243,7 +243,6 @@ function ProviderForm({
 
   const config = PROVIDER_CONFIGS[type];
 
-  // Auto-fill defaults when type changes
   useEffect(() => {
     if (!isEdit) {
       setName(config.label);
@@ -298,165 +297,171 @@ function ProviderForm({
   };
 
   const providerTypes = Object.entries(PROVIDER_CONFIGS) as [ProviderType, typeof config][];
+  const displayName = name || config.label;
 
   return (
-    <>
-      <DialogHeader>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onCancel}>
-            <X className="w-4 h-4" />
-          </Button>
-          <DialogTitle>{isEdit ? '编辑提供商' : '添加提供商'}</DialogTitle>
+    <div className="space-y-5">
+      {/* ── DeepLX-style header: Icon + Title + Test button ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold shrink-0"
+            style={{ backgroundColor: `${config.color}18`, color: config.color }}
+          >
+            {config.icon}
+          </div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">{displayName}</h2>
         </div>
-        <DialogDescription>
-          {isEdit ? '修改翻译服务配置' : '选择提供商类型并填写配置信息'}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="space-y-4 pt-2">
-        {/* Provider Type */}
-        {!isEdit && (
-          <div className="space-y-2">
-            <Label>提供商类型</Label>
-            <div className="relative">
-              <button
-                onClick={() => setTypeOpen(!typeOpen)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-input bg-background text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
-                    style={{ backgroundColor: `${config.color}20`, color: config.color }}
-                  >
-                    {config.icon}
-                  </span>
-                  {config.label}
-                </div>
-                <ChevronDown className={cn('w-4 h-4 transition-transform', typeOpen && 'rotate-180')} />
-              </button>
-              {typeOpen && (
-                <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
-                  <div className="max-h-56 overflow-y-auto py-1">
-                    {providerTypes.map(([key, cfg]) => (
-                      <button
-                        key={key}
-                        onClick={() => { setType(key); setTypeOpen(false); }}
-                        className={cn(
-                          'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
-                          type === key && 'bg-primary/5 text-primary'
-                        )}
-                      >
-                        <span
-                          className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
-                          style={{ backgroundColor: `${cfg.color}20`, color: cfg.color }}
-                        >
-                          {cfg.icon}
-                        </span>
-                        {cfg.label}
-                        {type === key && <Check className="w-4 h-4 ml-auto" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Name */}
-        <div className="space-y-2">
-          <Label>服务名称</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="例：我的 OpenAI" />
-        </div>
-
-        {/* API Key */}
-        {config.fields.includes('apiKey') && (
-          <div className="space-y-2">
-            <Label>API Key</Label>
-            <div className="relative">
-              <Input
-                type={showKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-XXXXXXXXXXXXXXXXXXXXXXXX"
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey(!showKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Base URL */}
-        {config.fields.includes('baseUrl') && (
-          <div className="space-y-2">
-            <Label>API 接口地址</Label>
-            <Input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder={config.defaultBaseUrl || 'https://api.example.com/v1/chat/completions'}
-            />
-            {config.defaultBaseUrl && (
-              <p className="text-xs text-muted-foreground">默认：{config.defaultBaseUrl}</p>
-            )}
-          </div>
-        )}
-
-        {/* Model */}
-        {config.fields.includes('model') && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>模型</Label>
-              {config.models.length > 0 && (
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                  <input type="checkbox" checked={customModel} onChange={(e) => setCustomModel(e.target.checked)} className="rounded" />
-                  自定义模型名
-                </label>
-              )}
-            </div>
-            {customModel || config.models.length === 0 ? (
-              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="输入模型名称" />
-            ) : (
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {config.models.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
-
-        {/* Test */}
-        <Button
-          variant="outline"
+        <button
           onClick={handleTest}
           disabled={testing || (!apiKey && config.fields.includes('apiKey'))}
-          className="w-full gap-2"
+          className={cn(
+            'text-sm font-medium transition-colors disabled:opacity-40',
+            testResult === 'success' ? 'text-primary' : 'text-primary hover:text-primary/80'
+          )}
         >
           {testing ? (
-            <><Loader2 className="w-4 h-4 animate-spin" />测试中...</>
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              测试中...
+            </span>
           ) : testResult === 'success' ? (
-            <><Check className="w-4 h-4 text-primary" />服务可用</>
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              服务可用
+            </span>
           ) : (
             '点此测试服务'
           )}
-        </Button>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onCancel}>取消</Button>
-          <Button onClick={handleSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">保存</Button>
-        </div>
+        </button>
       </div>
-    </>
+
+      {/* Sub-heading */}
+      <p className="text-sm text-muted-foreground -mt-2 pl-[4.25rem]">{config.label}</p>
+
+      {/* ── Provider Type selector (add mode only) ── */}
+      {!isEdit && (
+        <div className="space-y-1.5">
+          <label className="text-sm text-muted-foreground">提供商类型：</label>
+          <div className="relative">
+            <button
+              onClick={() => setTypeOpen(!typeOpen)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-input bg-background text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                  style={{ backgroundColor: `${config.color}20`, color: config.color }}
+                >
+                  {config.icon}
+                </span>
+                {config.label}
+              </div>
+              <ChevronDown className={cn('w-4 h-4 transition-transform', typeOpen && 'rotate-180')} />
+            </button>
+            {typeOpen && (
+              <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                <div className="max-h-56 overflow-y-auto py-1">
+                  {providerTypes.map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      onClick={() => { setType(key); setTypeOpen(false); }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
+                        type === key && 'bg-primary/5 text-primary'
+                      )}
+                    >
+                      <span
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                        style={{ backgroundColor: `${cfg.color}20`, color: cfg.color }}
+                      >
+                        {cfg.icon}
+                      </span>
+                      {cfg.label}
+                      {type === key && <Check className="w-4 h-4 ml-auto" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Fields — label on its own line, DeepLX style ── */}
+      <div className="space-y-1.5">
+        <label className="text-sm text-muted-foreground">自定义翻译服务名称：</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="例：我的 OpenAI" />
+      </div>
+
+      {config.fields.includes('baseUrl') && (
+        <div className="space-y-1.5">
+          <label className="text-sm text-muted-foreground">API URL:</label>
+          <Input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder={config.defaultBaseUrl || 'https://api.example.com/v1/chat/completions'}
+          />
+        </div>
+      )}
+
+      {config.fields.includes('apiKey') && (
+        <div className="space-y-1.5">
+          <label className="text-sm text-muted-foreground">APIKEY:</label>
+          <div className="relative">
+            <Input
+              type={showKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-XXXXXXXXXXXXXXXXXXXXXXXX"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {config.fields.includes('model') && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-muted-foreground">模型：</label>
+            {config.models.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                <input type="checkbox" checked={customModel} onChange={(e) => setCustomModel(e.target.checked)} className="rounded" />
+                自定义模型名
+              </label>
+            )}
+          </div>
+          {customModel || config.models.length === 0 ? (
+            <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="输入模型名称" />
+          ) : (
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {config.models.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* ── Action buttons ── */}
+      <div className="flex justify-end gap-2 pt-3 border-t border-border">
+        <Button variant="outline" onClick={onCancel}>取消</Button>
+        <Button onClick={handleSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">保存</Button>
+      </div>
+    </div>
   );
 }
