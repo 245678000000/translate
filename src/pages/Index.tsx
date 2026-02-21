@@ -130,34 +130,35 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-mesh-gradient flex flex-col">
       {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+      <header className="glass-header border-b border-border/50 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
               <Languages className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-lg font-semibold text-foreground">AI PDF 翻译</h1>
+            <h1 className="text-lg font-bold text-foreground tracking-tight">AI PDF 翻译</h1>
           </div>
           <ApiKeySettings onKeyChange={setHasCustomKey} />
         </div>
       </header>
 
       {/* Main */}
-      <main className="flex-1 flex items-center justify-center px-6 py-12">
+      <main className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-2xl">
           {state === 'upload' && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="space-y-8"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="card-elevated p-8 sm:p-10 space-y-8"
             >
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold text-foreground tracking-tight">
+              <div className="text-center space-y-3">
+                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gradient">
                   智能PDF翻译
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground text-base">
                   上传PDF文件，AI自动翻译并导出为新的PDF
                 </p>
               </div>
@@ -184,7 +185,7 @@ const Index = () => {
                       size="lg"
                       onClick={startTranslation}
                       disabled={isLoading}
-                      className="px-10 rounded-xl text-base"
+                      className="px-10 rounded-xl text-base bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity shadow-lg"
                     >
                       开始翻译
                     </Button>
@@ -195,28 +196,32 @@ const Index = () => {
           )}
 
           {state === 'translating' && (
-            <TranslationProgress
-              currentPage={currentPage}
-              totalPages={pdfInfo?.numPages || 0}
-              currentText={currentPreview}
-              onCancel={handleCancel}
-              usingCustomKey={hasCustomKey}
-            />
+            <div className="card-elevated p-8 sm:p-10">
+              <TranslationProgress
+                currentPage={currentPage}
+                totalPages={pdfInfo?.numPages || 0}
+                currentText={currentPreview}
+                onCancel={handleCancel}
+                usingCustomKey={hasCustomKey}
+              />
+            </div>
           )}
 
           {state === 'done' && (
-            <TranslationResult
-              pages={translatedPages}
-              onExport={handleExport}
-              onReset={handleReset}
-            />
+            <div className="card-elevated p-8 sm:p-10">
+              <TranslationResult
+                pages={translatedPages}
+                onExport={handleExport}
+                onReset={handleReset}
+              />
+            </div>
           )}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-6">
-        <p className="text-center text-xs text-muted-foreground">
+      <footer className="py-8">
+        <p className="text-center text-xs text-muted-foreground tracking-widest uppercase">
           Powered by AI · 支持中英文互译
         </p>
       </footer>
