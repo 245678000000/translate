@@ -41,7 +41,7 @@ serve(async (req) => {
     let authHeader: string;
     let model: string;
 
-    if (useCustomKey) {
+    if (customApiKey) {
       apiUrl = customBaseUrl || "https://api.openai.com/v1/chat/completions";
       authHeader = `Bearer ${customApiKey}`;
       model = "gpt-4o-mini";
