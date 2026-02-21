@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { getStoredApiKey } from '@/components/ApiKeySettings';
+import { getActiveProviderConfig } from '@/lib/providers';
 import { LanguageDropdown, LANGUAGES } from '@/components/LanguageDropdown';
 
 export function TextTranslation() {
@@ -29,14 +29,14 @@ export function TextTranslation() {
     abortRef.current = new AbortController();
 
     try {
-      const keyConfig = getStoredApiKey();
+      const keyConfig = getActiveProviderConfig();
       const body: Record<string, string> = {
         text,
         direction: `${sourceLang}-${targetLang}`,
         sourceLang,
         targetLang,
       };
-      if (keyConfig) {
+      if (keyConfig?.apiKey) {
         body.customApiKey = keyConfig.apiKey;
         if (keyConfig.baseUrl) body.customBaseUrl = keyConfig.baseUrl;
       }

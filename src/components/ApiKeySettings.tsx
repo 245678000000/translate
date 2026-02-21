@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Settings, Check, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Settings, Plus, Pencil, Trash2, Star, Check, X, ChevronDown, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,139 +12,451 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/sonner';
+import { cn } from '@/lib/utils';
+import {
+  type TranslationProvider,
+  type ProviderType,
+  PROVIDER_CONFIGS,
+  getProviders,
+  saveProviders,
+  getActiveProviderConfig,
+} from '@/lib/providers';
+import { supabase } from '@/integrations/supabase/client';
 
-const STORAGE_KEY = 'pdf-translate-api-key';
-
-export interface ApiKeyConfig {
-  apiKey: string;
-  baseUrl?: string;
-}
-
+// Re-export for backward compatibility
+export type ApiKeyConfig = { apiKey: string; baseUrl?: string };
 export function getStoredApiKey(): ApiKeyConfig | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.apiKey) return parsed;
-    return null;
-  } catch {
-    return null;
-  }
+  return getActiveProviderConfig() as ApiKeyConfig | null;
 }
+
+type View = 'list' | 'add' | 'edit';
 
 export function ApiKeySettings({ onKeyChange }: { onKeyChange?: (hasKey: boolean) => void }) {
   const [open, setOpen] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [saved, setSaved] = useState(false);
+  const [view, setView] = useState<View>('list');
+  const [providers, setProviders] = useState<TranslationProvider[]>([]);
+  const [editingProvider, setEditingProvider] = useState<TranslationProvider | null>(null);
+  const hasCustom = providers.some(p => !p.isSystem && p.enabled && p.apiKey);
 
   useEffect(() => {
-    const config = getStoredApiKey();
-    if (config) {
-      setApiKey(config.apiKey);
-      setBaseUrl(config.baseUrl || '');
-      setSaved(true);
-    }
-  }, []);
+    setProviders(getProviders());
+  }, [open]);
 
-  const handleSave = () => {
-    if (!apiKey.trim()) {
-      toast.error('请输入 API Key');
-      return;
+  const persist = useCallback((updated: TranslationProvider[]) => {
+    setProviders(updated);
+    saveProviders(updated);
+    onKeyChange?.(updated.some(p => !p.isSystem && p.isDefault && p.enabled && p.apiKey));
+  }, [onKeyChange]);
+
+  const handleDelete = (id: string) => {
+    const updated = providers.filter(p => p.id !== id);
+    // If deleted was default, set system as default
+    if (!updated.some(p => p.isDefault)) {
+      const sys = updated.find(p => p.isSystem);
+      if (sys) sys.isDefault = true;
     }
-    const config: ApiKeyConfig = { apiKey: apiKey.trim() };
-    if (baseUrl.trim()) config.baseUrl = baseUrl.trim();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    setSaved(true);
-    onKeyChange?.(true);
-    toast.success('API Key 已保存');
-    setOpen(false);
+    persist(updated);
+    toast.success('已删除');
   };
 
-  const handleClear = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setApiKey('');
-    setBaseUrl('');
-    setSaved(false);
-    onKeyChange?.(false);
-    toast.success('API Key 已清除');
+  const handleSetDefault = (id: string) => {
+    const updated = providers.map(p => ({ ...p, isDefault: p.id === id }));
+    persist(updated);
+    toast.success('已设为默认');
+  };
+
+  const handleSaveProvider = (provider: TranslationProvider) => {
+    let updated: TranslationProvider[];
+    const existing = providers.find(p => p.id === provider.id);
+    if (existing) {
+      updated = providers.map(p => p.id === provider.id ? provider : p);
+    } else {
+      updated = [...providers, provider];
+    }
+    persist(updated);
+    setView('list');
+    setEditingProvider(null);
+    toast.success('已保存');
+  };
+
+  const openAdd = () => {
+    setEditingProvider(null);
+    setView('add');
+  };
+
+  const openEdit = (p: TranslationProvider) => {
+    setEditingProvider(p);
+    setView('edit');
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setView('list'); setEditingProvider(null); } }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Settings className="w-5 h-5" />
-          {saved && (
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500" />
+          {hasCustom && (
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary" />
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>API Key 设置</DialogTitle>
-          <DialogDescription>
-            请输入你自己的 API Key，翻译将优先使用你的 Key（更安全、更便宜）
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 pt-2">
-          {saved && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <Check className="w-4 h-4" />
-              <span>已设置</span>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="api-key">API Key</Label>
-            <Input
-              id="api-key"
-              type="password"
-              placeholder="sk-XXXXXXXXXXXXXXXXXXXXXXXX"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="base-url">API Base URL（可选）</Label>
-            <Input
-              id="base-url"
-              type="url"
-              placeholder="https://api.openai.com/v1/chat/completions"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-            />
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            支持 OpenAI / Groq / DeepSeek / 通义千问 / Claude 等（推荐 OpenAI）
-          </p>
-
-          <div className="flex items-center justify-between pt-2">
-            <div>
-              {saved && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={handleClear}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  清除 Key
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                取消
-              </Button>
-              <Button onClick={handleSave}>保存</Button>
-            </div>
-          </div>
-        </div>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        {view === 'list' && (
+          <ProviderList
+            providers={providers}
+            onAdd={openAdd}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onSetDefault={handleSetDefault}
+          />
+        )}
+        {(view === 'add' || view === 'edit') && (
+          <ProviderForm
+            provider={editingProvider}
+            onSave={handleSaveProvider}
+            onCancel={() => { setView('list'); setEditingProvider(null); }}
+          />
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ────── Provider List ────── */
+function ProviderList({
+  providers,
+  onAdd,
+  onEdit,
+  onDelete,
+  onSetDefault,
+}: {
+  providers: TranslationProvider[];
+  onAdd: () => void;
+  onEdit: (p: TranslationProvider) => void;
+  onDelete: (id: string) => void;
+  onSetDefault: (id: string) => void;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center justify-between">
+          <DialogTitle>翻译服务提供商</DialogTitle>
+          <Button size="sm" onClick={onAdd} className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90">
+            <Plus className="w-4 h-4" />
+            添加
+          </Button>
+        </div>
+        <DialogDescription>
+          管理你的翻译服务提供商，翻译时将优先使用默认提供商
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-2 pt-2">
+        {providers.map((p) => {
+          const config = PROVIDER_CONFIGS[p.type] || PROVIDER_CONFIGS.custom;
+          return (
+            <div
+              key={p.id}
+              className={cn(
+                'flex items-center gap-3 p-3 rounded-xl border transition-colors',
+                p.isDefault ? 'border-primary/30 bg-primary/[0.04]' : 'border-border'
+              )}
+            >
+              {/* Icon */}
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
+                style={{ backgroundColor: `${config.color}20`, color: config.color }}
+              >
+                {config.icon}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm text-foreground truncate">{p.name}</span>
+                  {p.isDefault && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                      默认
+                    </span>
+                  )}
+                  {p.isSystem && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                      系统
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {config.label}{p.model ? ` · ${p.model}` : ''}
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1 shrink-0">
+                {!p.isDefault && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onSetDefault(p.id)} title="设为默认">
+                    <Star className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+                {!p.isSystem && (
+                  <>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(p)} title="编辑">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(p.id)} title="删除">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-muted-foreground pt-2">
+        未设置自定义提供商时，将使用系统默认服务进行翻译
+      </p>
+    </>
+  );
+}
+
+/* ────── Provider Form (Add/Edit) ────── */
+function ProviderForm({
+  provider,
+  onSave,
+  onCancel,
+}: {
+  provider: TranslationProvider | null;
+  onSave: (p: TranslationProvider) => void;
+  onCancel: () => void;
+}) {
+  const isEdit = !!provider;
+  const [type, setType] = useState<ProviderType>(provider?.type || 'openai');
+  const [name, setName] = useState(provider?.name || '');
+  const [apiKey, setApiKey] = useState(provider?.apiKey || '');
+  const [baseUrl, setBaseUrl] = useState(provider?.baseUrl || '');
+  const [model, setModel] = useState(provider?.model || '');
+  const [customModel, setCustomModel] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [typeOpen, setTypeOpen] = useState(false);
+
+  const config = PROVIDER_CONFIGS[type];
+
+  // Auto-fill defaults when type changes
+  useEffect(() => {
+    if (!isEdit) {
+      setName(config.label);
+      setBaseUrl(config.defaultBaseUrl);
+      setModel(config.models[0] || '');
+      setCustomModel(false);
+    }
+  }, [type, isEdit, config]);
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('translate', {
+        body: {
+          text: 'Hello',
+          sourceLang: 'en',
+          targetLang: 'zh',
+          customApiKey: apiKey || undefined,
+          customBaseUrl: baseUrl || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.translatedText) {
+        setTestResult('success');
+        toast.success('服务可用 ✅');
+      } else {
+        throw new Error('无响应');
+      }
+    } catch (err: any) {
+      setTestResult('error');
+      toast.error(`测试失败: ${err.message || '未知错误'}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = () => {
+    if (!name.trim()) { toast.error('请输入服务名称'); return; }
+    if (config.fields.includes('apiKey') && !apiKey.trim()) { toast.error('请输入 API Key'); return; }
+
+    onSave({
+      id: provider?.id || crypto.randomUUID(),
+      name: name.trim(),
+      type,
+      apiKey: apiKey.trim() || undefined,
+      baseUrl: baseUrl.trim() || undefined,
+      model: model.trim() || undefined,
+      enabled: true,
+      isDefault: provider?.isDefault || false,
+    });
+  };
+
+  const providerTypes = Object.entries(PROVIDER_CONFIGS) as [ProviderType, typeof config][];
+
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onCancel}>
+            <X className="w-4 h-4" />
+          </Button>
+          <DialogTitle>{isEdit ? '编辑提供商' : '添加提供商'}</DialogTitle>
+        </div>
+        <DialogDescription>
+          {isEdit ? '修改翻译服务配置' : '选择提供商类型并填写配置信息'}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4 pt-2">
+        {/* Provider Type */}
+        {!isEdit && (
+          <div className="space-y-2">
+            <Label>提供商类型</Label>
+            <div className="relative">
+              <button
+                onClick={() => setTypeOpen(!typeOpen)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-input bg-background text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                    style={{ backgroundColor: `${config.color}20`, color: config.color }}
+                  >
+                    {config.icon}
+                  </span>
+                  {config.label}
+                </div>
+                <ChevronDown className={cn('w-4 h-4 transition-transform', typeOpen && 'rotate-180')} />
+              </button>
+              {typeOpen && (
+                <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                  <div className="max-h-56 overflow-y-auto py-1">
+                    {providerTypes.map(([key, cfg]) => (
+                      <button
+                        key={key}
+                        onClick={() => { setType(key); setTypeOpen(false); }}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors',
+                          type === key && 'bg-primary/5 text-primary'
+                        )}
+                      >
+                        <span
+                          className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold"
+                          style={{ backgroundColor: `${cfg.color}20`, color: cfg.color }}
+                        >
+                          {cfg.icon}
+                        </span>
+                        {cfg.label}
+                        {type === key && <Check className="w-4 h-4 ml-auto" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Name */}
+        <div className="space-y-2">
+          <Label>服务名称</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="例：我的 OpenAI" />
+        </div>
+
+        {/* API Key */}
+        {config.fields.includes('apiKey') && (
+          <div className="space-y-2">
+            <Label>API Key</Label>
+            <div className="relative">
+              <Input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-XXXXXXXXXXXXXXXXXXXXXXXX"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Base URL */}
+        {config.fields.includes('baseUrl') && (
+          <div className="space-y-2">
+            <Label>API 接口地址</Label>
+            <Input
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder={config.defaultBaseUrl || 'https://api.example.com/v1/chat/completions'}
+            />
+            {config.defaultBaseUrl && (
+              <p className="text-xs text-muted-foreground">默认：{config.defaultBaseUrl}</p>
+            )}
+          </div>
+        )}
+
+        {/* Model */}
+        {config.fields.includes('model') && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>模型</Label>
+              {config.models.length > 0 && (
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  <input type="checkbox" checked={customModel} onChange={(e) => setCustomModel(e.target.checked)} className="rounded" />
+                  自定义模型名
+                </label>
+              )}
+            </div>
+            {customModel || config.models.length === 0 ? (
+              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="输入模型名称" />
+            ) : (
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {config.models.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {/* Test */}
+        <Button
+          variant="outline"
+          onClick={handleTest}
+          disabled={testing || (!apiKey && config.fields.includes('apiKey'))}
+          className="w-full gap-2"
+        >
+          {testing ? (
+            <><Loader2 className="w-4 h-4 animate-spin" />测试中...</>
+          ) : testResult === 'success' ? (
+            <><Check className="w-4 h-4 text-primary" />服务可用</>
+          ) : (
+            '点此测试服务'
+          )}
+        </Button>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onCancel}>取消</Button>
+          <Button onClick={handleSave} className="bg-gradient-to-r from-primary to-accent hover:opacity-90">保存</Button>
+        </div>
+      </div>
+    </>
   );
 }

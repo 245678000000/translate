@@ -10,7 +10,7 @@ import { extractPDFContent, groupIntoParagraphs, type PDFInfo } from '@/lib/pdf-
 import { exportTranslatedPDF, type TranslatedPage } from '@/lib/pdf-export';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { getStoredApiKey } from '@/components/ApiKeySettings';
+import { getActiveProviderConfig } from '@/lib/providers';
 
 type DocState = 'upload' | 'translating' | 'done';
 
@@ -24,7 +24,7 @@ export function DocumentTranslation() {
   const [currentPreview, setCurrentPreview] = useState('');
   const [translatedPages, setTranslatedPages] = useState<TranslatedPage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasCustomKey] = useState(() => !!getStoredApiKey());
+  const [hasCustomKey] = useState(() => !!getActiveProviderConfig());
   const cancelRef = useRef(false);
 
   const handleFileSelect = useCallback(async (f: File) => {
@@ -64,14 +64,14 @@ export function DocumentTranslation() {
       }
 
       try {
-        const keyConfig = getStoredApiKey();
+        const keyConfig = getActiveProviderConfig();
         const body: Record<string, string> = {
           text: page.text,
           direction: `${sourceLang}-${targetLang}`,
           sourceLang,
           targetLang,
         };
-        if (keyConfig) {
+        if (keyConfig?.apiKey) {
           body.customApiKey = keyConfig.apiKey;
           if (keyConfig.baseUrl) body.customBaseUrl = keyConfig.baseUrl;
         }
