@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Languages, FileText, Type } from 'lucide-react';
 import { ApiKeySettings } from '@/components/ApiKeySettings';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { TextTranslation } from '@/components/TextTranslation';
 import { DocumentTranslation } from '@/components/DocumentTranslation';
 import { cn } from '@/lib/utils';
@@ -56,7 +57,10 @@ const Index = () => {
           </nav>
 
           {/* Settings */}
-          <ApiKeySettings onKeyChange={() => {}} />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <ApiKeySettings onKeyChange={() => {}} />
+          </div>
         </div>
       </header>
 
