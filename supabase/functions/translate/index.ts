@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, direction } = await req.json();
+    const { text, direction, customApiKey, customBaseUrl } = await req.json();
 
     if (!text || !direction) {
       return new Response(
@@ -21,33 +21,45 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    const useCustomKey = !!customApiKey;
 
     const systemPrompt =
       direction === "zh-en"
         ? "You are a professional translator. Translate the following Chinese text to English. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only."
         : "You are a professional translator. Translate the following English text to Chinese. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only.";
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: text },
-          ],
-        }),
+    let apiUrl: string;
+    let authHeader: string;
+    let model: string;
+
+    if (useCustomKey) {
+      apiUrl = customBaseUrl || "https://api.openai.com/v1/chat/completions";
+      authHeader = `Bearer ${customApiKey}`;
+      model = "gpt-4o-mini";
+    } else {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        throw new Error("LOVABLE_API_KEY is not configured");
       }
-    );
+      apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
+      authHeader = `Bearer ${LOVABLE_API_KEY}`;
+      model = "google/gemini-3-flash-preview";
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text },
+        ],
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {

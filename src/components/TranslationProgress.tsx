@@ -8,6 +8,7 @@ interface TranslationProgressProps {
   totalPages: number;
   currentText: string;
   onCancel: () => void;
+  usingCustomKey?: boolean;
 }
 
 export function TranslationProgress({
@@ -15,6 +16,7 @@ export function TranslationProgress({
   totalPages,
   currentText,
   onCancel,
+  usingCustomKey = false,
 }: TranslationProgressProps) {
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0;
 
@@ -33,6 +35,10 @@ export function TranslationProgress({
           第 {currentPage} / {totalPages} 页
         </p>
       </div>
+
+      <p className="text-xs text-muted-foreground">
+          当前使用：{usingCustomKey ? '你的自定义 API Key' : '系统默认 Key'}
+        </p>
 
       <Progress value={progress} className="h-2" />
 
