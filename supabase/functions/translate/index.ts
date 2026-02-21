@@ -12,21 +12,30 @@ serve(async (req) => {
   }
 
   try {
-    const { text, direction, customApiKey, customBaseUrl } = await req.json();
+    const { text, direction, customApiKey, customBaseUrl, sourceLang, targetLang } = await req.json();
 
-    if (!text || !direction) {
+    if (!text) {
       return new Response(
-        JSON.stringify({ error: "Missing text or direction" }),
+        JSON.stringify({ error: "Missing text" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const useCustomKey = !!customApiKey;
+    const langMap: Record<string, string> = {
+      auto: "auto-detect the source language",
+      zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean",
+      fr: "French", de: "German", es: "Spanish", pt: "Portuguese",
+      it: "Italian", ru: "Russian", ar: "Arabic", th: "Thai",
+      vi: "Vietnamese", id: "Indonesian", ms: "Malay", hi: "Hindi",
+      tr: "Turkish", pl: "Polish", nl: "Dutch", sv: "Swedish",
+      da: "Danish", fi: "Finnish", no: "Norwegian", uk: "Ukrainian",
+      cs: "Czech", ro: "Romanian", el: "Greek", hu: "Hungarian", bg: "Bulgarian",
+    };
 
-    const systemPrompt =
-      direction === "zh-en"
-        ? "You are a professional translator. Translate the following Chinese text to English. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only."
-        : "You are a professional translator. Translate the following English text to Chinese. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only.";
+    const srcName = sourceLang ? (langMap[sourceLang] || sourceLang) : "auto-detect the source language";
+    const tgtName = targetLang ? (langMap[targetLang] || targetLang) : "English";
+
+    const systemPrompt = `You are a professional translator. ${srcName === "auto-detect the source language" ? "Auto-detect the source language and translate" : `Translate from ${srcName}`} to ${tgtName}. Only return the plain translated text, nothing else. Do NOT use any markdown formatting such as bold (**), italic (*), headers (#), bullet points, or any other markup. Preserve paragraph structure using plain newlines only.`;
 
     let apiUrl: string;
     let authHeader: string;
