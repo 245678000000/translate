@@ -1,36 +1,58 @@
 
 
-# AI PDF 翻译网站
+# 智能PDF翻译 - API Key 设置功能
 
-一个简洁现代的在线PDF翻译工具，支持中英文互译，翻译完成后可导出为新的PDF文件。
+## 概述
+在现有界面中添加 API Key 设置功能，让用户可以使用自己的 API Key 进行翻译，同时保留系统默认 Key 作为备选。
 
-## 核心功能
+## 新增/修改的文件
 
-### 1. 首页 — 上传与设置
-- 简洁的着陆页面，中央放置PDF上传区域（支持拖拽上传和点击上传）
-- 显示文件名、页数等基本信息
-- 翻译方向选择：中→英 / 英→中，一键切换
-- "开始翻译"按钮
+### 1. 新建 `src/components/ApiKeySettings.tsx`
+- 齿轮图标设置按钮组件 + 模态框（使用现有 Dialog 组件）
+- 模态框内容：
+  - 说明文字
+  - API Key 输入框（密码类型，placeholder: `sk-XXXXXXXXXXXXXXXXXXXXXXXX`）
+  - API Base URL 输入框（可选，默认 OpenAI）
+  - 支持模型说明文字
+  - 保存/取消按钮
+  - 已保存时显示绿色"已设置"提示 + 红色"清除 Key"按钮
+- 使用 localStorage 存储 key（key: `pdf-translate-api-key`）
+- 提供 hook 或工具函数读取已保存的 key
 
-### 2. 翻译进度页面
-- 显示翻译进度条，按页翻译
-- 实时展示当前正在翻译的内容预览
-- 支持取消翻译操作
+### 2. 修改 `src/pages/Index.tsx`
+- 在 header 右侧添加 ApiKeySettings 组件
+- 读取 localStorage 中的 API Key
+- 翻译时将 customApiKey 传递给 edge function
+- 将 `hasCustomKey` 状态传递给 TranslationProgress
 
-### 3. 翻译结果页面
-- 翻译完成后展示译文内容预览
-- **导出PDF按钮**：将翻译结果生成为格式整齐的PDF文件供下载
-- 支持重新翻译或上传新文件
+### 3. 修改 `src/components/TranslationProgress.tsx`
+- 新增 `usingCustomKey` prop
+- 在进度条上方显示提示文字：
+  - 有自定义 Key："当前使用：你的自定义 API Key"
+  - 无自定义 Key："当前使用：系统默认 Key"
 
-## 设计风格
-- 简洁现代，类似 DeepL 的清爽界面
-- 白色背景为主，蓝色作为主题色
-- 大量留白，排版清晰
-- 流畅的过渡动画
+### 4. 修改 `supabase/functions/translate/index.ts`
+- 接收可选的 `customApiKey` 和 `customBaseUrl` 参数
+- 如果提供了 customApiKey，使用用户的 key 调用 OpenAI 兼容 API
+- 如果未提供，继续使用 Lovable AI Gateway（保持原有逻辑）
+- 用户自定义 key 默认调用 `https://api.openai.com/v1/chat/completions`，使用 `gpt-4o-mini` 模型
 
-## 技术方案
-- 使用 Lovable Cloud 作为后端
-- 通过 Lovable AI（Gemini）进行翻译
-- 前端使用 pdf.js 解析PDF内容，jsPDF 生成翻译后的PDF
-- Edge Function 处理翻译请求
+## 技术细节
+
+### localStorage 结构
+```text
+key: "pdf-translate-api-key"
+value: JSON string { apiKey: string, baseUrl?: string }
+```
+
+### Edge Function 请求体变更
+```text
+原有: { text, direction }
+新增: { text, direction, customApiKey?, customBaseUrl? }
+```
+
+### 安全注意事项
+- API Key 仅存储在用户浏览器 localStorage 中
+- 通过 HTTPS 传输到 edge function，不持久化到服务器
+- Edge function 中不记录用户的 API Key
 
