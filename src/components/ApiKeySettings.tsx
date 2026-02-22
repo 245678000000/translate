@@ -405,6 +405,17 @@ function ProviderForm({
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder={config.defaultBaseUrl || 'https://api.example.com/v1/chat/completions'}
           />
+          {baseUrl.trim() && (
+            <p className="text-xs text-muted-foreground truncate" style={{ color: '#64748b' }}>
+              预览: {(() => {
+                const url = baseUrl.trim().replace(/\/+$/, '');
+                if (url.endsWith('/chat/completions')) return url;
+                if (url.endsWith('/v1')) return `${url}/chat/completions`;
+                if (url.match(/\/v\d+$/)) return `${url}/chat/completions`;
+                return `${url}/v1/chat/completions`;
+              })()}
+            </p>
+          )}
         </div>
       )}
 
