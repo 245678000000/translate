@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Languages, FileText, Type } from 'lucide-react';
 import { ApiKeySettings } from '@/components/ApiKeySettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { TextTranslation } from '@/components/TextTranslation';
-import { DocumentTranslation } from '@/components/DocumentTranslation';
 import { cn } from '@/lib/utils';
 
 type TabType = 'text' | 'document';
+
+const DocumentTranslation = lazy(async () => {
+  const module = await import('@/components/DocumentTranslation');
+  return { default: module.DocumentTranslation };
+});
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<TabType>('text');
@@ -68,7 +72,13 @@ const Index = () => {
       <main className="flex-1 flex items-start justify-center px-3 sm:px-6 py-4 sm:py-12">
         <div className="w-full max-w-5xl">
           <div className="card-elevated p-3 sm:p-5 md:p-8">
-            {activeTab === 'text' ? <TextTranslation /> : <DocumentTranslation />}
+            {activeTab === 'text' ? (
+              <TextTranslation />
+            ) : (
+              <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">加载文档翻译模块中...</div>}>
+                <DocumentTranslation />
+              </Suspense>
+            )}
           </div>
         </div>
       </main>

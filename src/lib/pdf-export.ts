@@ -1,5 +1,10 @@
-import jsPDF from 'jspdf';
 import { type Paragraph } from './pdf-utils';
+
+type JsPDFConstructor = typeof import('jspdf')['default'];
+type JsPDFDocument = InstanceType<JsPDFConstructor>;
+
+let jsPDFCtorPromise: Promise<JsPDFConstructor> | null = null;
+let cachedFontBase64: string | null = null;
 
 export interface TranslatedPage {
   pageNumber: number;
@@ -10,11 +15,14 @@ export interface TranslatedPage {
   paragraphs?: Paragraph[];
 }
 
-const PT_TO_MM = 0.3528;
+async function getJsPDFConstructor(): Promise<JsPDFConstructor> {
+  if (!jsPDFCtorPromise) {
+    jsPDFCtorPromise = import('jspdf').then((module) => module.default);
+  }
+  return jsPDFCtorPromise;
+}
 
-let cachedFontBase64: string | null = null;
-
-async function loadCJKFont(doc: jsPDF): Promise<boolean> {
+async function loadCJKFont(doc: JsPDFDocument): Promise<boolean> {
   try {
     if (!cachedFontBase64) {
       const resp = await fetch(
@@ -40,9 +48,13 @@ async function loadCJKFont(doc: jsPDF): Promise<boolean> {
   }
 }
 
-function setFont(doc: jsPDF, hasCJK: boolean) {
+function setFont(doc: JsPDFDocument, hasCJK: boolean) {
   if (hasCJK) {
-    try { doc.setFont('NotoSansSC', 'normal'); } catch { /* fallback */ }
+    try {
+      doc.setFont('NotoSansSC', 'normal');
+    } catch {
+      // fallback
+    }
   }
 }
 
@@ -50,6 +62,7 @@ export async function exportTranslatedPDF(
   translatedPages: TranslatedPage[],
   originalFileName: string
 ): Promise<void> {
+  const jsPDF = await getJsPDFConstructor();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const hasCJK = await loadCJKFont(doc);
   const margin = 18;
@@ -66,22 +79,19 @@ export async function exportTranslatedPDF(
     setFont(doc, hasCJK);
     let y = margin;
 
-    // Page number header
     doc.setFontSize(9);
     doc.setTextColor(180, 180, 180);
     doc.text(`- ${page.pageNumber} -`, pageW / 2, y, { align: 'center' });
     y += 7;
 
-    // Content
     doc.setFontSize(fontSize);
     doc.setTextColor(30, 30, 30);
     setFont(doc, hasCJK);
 
-    // Split by newlines to get paragraphs, collapse multiple blank lines
     const paragraphs = page.translatedText
       .replace(/\n{3,}/g, '\n\n')
       .split(/\n{2,}/)
-      .filter(p => p.trim());
+      .filter((p) => p.trim());
 
     for (const para of paragraphs) {
       const trimmed = para.replace(/[ \t]{3,}/g, '  ').trim();

@@ -131,6 +131,24 @@ export const PROVIDER_CONFIGS: Record<ProviderType, ProviderTypeConfig> = {
 
 const STORAGE_KEY = 'pdf-translate-providers';
 
+export interface ActiveProviderConfig {
+  providerType: ProviderType;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+}
+
+export interface TranslateRequestBody {
+  text: string;
+  direction: string;
+  sourceLang: string;
+  targetLang: string;
+  providerType?: ProviderType;
+  customApiKey?: string;
+  customBaseUrl?: string;
+  model?: string;
+}
+
 export function getProviders(): TranslationProvider[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -150,13 +168,42 @@ export function saveProviders(providers: TranslationProvider[]) {
 export function getDefaultProvider(): TranslationProvider | null {
   const providers = getProviders();
   const defaultP = providers.find(p => p.isDefault && p.enabled);
-  if (defaultP && defaultP.apiKey) return defaultP;
-  return null;
+  return defaultP || null;
 }
 
 // Backward-compatible: used by TextTranslation & DocumentTranslation
-export function getActiveProviderConfig(): { apiKey?: string; baseUrl?: string; providerType?: string } | null {
+export function getActiveProviderConfig(): ActiveProviderConfig | null {
   const p = getDefaultProvider();
   if (!p) return null;
-  return { apiKey: p.apiKey, baseUrl: p.baseUrl, providerType: p.type };
+  return { providerType: p.type, apiKey: p.apiKey, baseUrl: p.baseUrl, model: p.model };
+}
+
+export function buildTranslateRequestBody(input: {
+  text: string;
+  sourceLang: string;
+  targetLang: string;
+  providerConfig?: ActiveProviderConfig | null;
+}): TranslateRequestBody {
+  const { text, sourceLang, targetLang, providerConfig } = input;
+  const body: TranslateRequestBody = {
+    text,
+    direction: `${sourceLang}-${targetLang}`,
+    sourceLang,
+    targetLang,
+  };
+
+  if (!providerConfig) return body;
+
+  body.providerType = providerConfig.providerType;
+  if (providerConfig.apiKey?.trim()) {
+    body.customApiKey = providerConfig.apiKey.trim();
+  }
+  if (providerConfig.baseUrl?.trim()) {
+    body.customBaseUrl = providerConfig.baseUrl.trim();
+  }
+  if (providerConfig.model?.trim()) {
+    body.model = providerConfig.model.trim();
+  }
+
+  return body;
 }

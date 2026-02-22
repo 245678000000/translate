@@ -9,7 +9,7 @@ import { extractPDFContent, groupIntoParagraphs, type PDFInfo } from '@/lib/pdf-
 import { exportTranslatedPDF, type TranslatedPage } from '@/lib/pdf-export';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { getActiveProviderConfig, getDefaultProvider } from '@/lib/providers';
+import { buildTranslateRequestBody, getActiveProviderConfig, getDefaultProvider } from '@/lib/providers';
 import { extractTextFromAnyFile } from '@/lib/file-extract';
 
 type DocState = 'upload' | 'translating' | 'done';
@@ -142,10 +142,10 @@ export function DocumentTranslation() {
 
         // Stage: done
         updateFileProgress(uf.id, { stage: 'done', progress: 100 });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (cancelRef.current) break;
         updateFileProgress(uf.id, { stage: 'error', progress: 0 });
-        toast.error(`${uf.file.name}: ${err.message || '处理失败'}`);
+        toast.error(`${uf.file.name}: ${getErrorMessage(err, '处理失败')}`);
       }
     }
 
@@ -241,19 +241,19 @@ function delay(ms: number) {
 
 async function translateText(text: string, sourceLang: string, targetLang: string): Promise<string> {
   const keyConfig = getActiveProviderConfig();
-  const body: Record<string, string> = {
+  const body = buildTranslateRequestBody({
     text,
-    direction: `${sourceLang}-${targetLang}`,
     sourceLang,
     targetLang,
-  };
-  if (keyConfig?.apiKey) {
-    body.customApiKey = keyConfig.apiKey;
-    if (keyConfig.baseUrl) body.customBaseUrl = keyConfig.baseUrl;
-    if (keyConfig.providerType) body.providerType = keyConfig.providerType;
-  }
+    providerConfig: keyConfig,
+  });
 
   const { data, error } = await supabase.functions.invoke('translate', { body });
   if (error) throw error;
   return data?.translatedText || '';
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }

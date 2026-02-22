@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { getActiveProviderConfig } from '@/lib/providers';
+import { buildTranslateRequestBody, getActiveProviderConfig } from '@/lib/providers';
 import { LanguageDropdown, LANGUAGES } from '@/components/LanguageDropdown';
 
 export function TextTranslation() {
@@ -30,24 +30,22 @@ export function TextTranslation() {
 
     try {
       const keyConfig = getActiveProviderConfig();
-      const body: Record<string, string> = {
+      const body = buildTranslateRequestBody({
         text,
-        direction: `${sourceLang}-${targetLang}`,
         sourceLang,
         targetLang,
-      };
-      if (keyConfig?.apiKey) {
-        body.customApiKey = keyConfig.apiKey;
-        if (keyConfig.baseUrl) body.customBaseUrl = keyConfig.baseUrl;
-        if (keyConfig.providerType) body.providerType = keyConfig.providerType;
-      }
+        providerConfig: keyConfig,
+      });
 
-      const { data, error } = await supabase.functions.invoke('translate', { body });
+      const { data, error } = await supabase.functions.invoke('translate', {
+        body,
+        signal: abortRef.current.signal,
+      });
       if (error) throw error;
       setTranslatedText(data?.translatedText || '');
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        toast.error(`翻译失败: ${err.message || '未知错误'}`);
+    } catch (err: unknown) {
+      if (!isAbortError(err)) {
+        toast.error(`翻译失败: ${getErrorMessage(err)}`);
       }
     } finally {
       setIsTranslating(false);
@@ -101,6 +99,13 @@ export function TextTranslation() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceLang, targetLang]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+  }, []);
 
   return (
     <motion.div
@@ -196,4 +201,18 @@ export function TextTranslation() {
       </div>
     </motion.div>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return '未知错误';
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'AbortError') return true;
+  if (/abort/i.test(error.message)) return true;
+
+  const withCause = error as Error & { cause?: unknown };
+  return withCause.cause instanceof Error && withCause.cause.name === 'AbortError';
 }

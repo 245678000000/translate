@@ -2,14 +2,36 @@
  * Client-side text extraction for 20+ file formats.
  * PDF uses pdf.js (existing), office formats use mammoth/xlsx/jszip.
  */
-import mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
-import JSZip from 'jszip';
+
+type MammothModule = typeof import('mammoth');
+type XlsxModule = typeof import('xlsx');
+type JSZipModule = typeof import('jszip');
+type JSZipInstance = InstanceType<JSZipModule['default']>;
+
+let mammothPromise: Promise<MammothModule> | null = null;
+let xlsxPromise: Promise<XlsxModule> | null = null;
+let jszipPromise: Promise<JSZipModule> | null = null;
 
 export interface ExtractionResult {
   text: string;
   pages?: number;
   format: string;
+}
+
+async function getMammoth(): Promise<MammothModule> {
+  if (!mammothPromise) mammothPromise = import('mammoth');
+  return mammothPromise;
+}
+
+async function getXlsx(): Promise<XlsxModule> {
+  if (!xlsxPromise) xlsxPromise = import('xlsx');
+  return xlsxPromise;
+}
+
+async function getJSZip(): Promise<JSZipModule['default']> {
+  if (!jszipPromise) jszipPromise = import('jszip');
+  const module = await jszipPromise;
+  return module.default;
 }
 
 /**
@@ -30,14 +52,14 @@ export async function extractTextFromAnyFile(file: File): Promise<ExtractionResu
     const raw = await file.text();
     const div = document.createElement('div');
     div.innerHTML = raw;
-    // Remove script/style tags
-    div.querySelectorAll('script, style').forEach(el => el.remove());
+    div.querySelectorAll('script, style').forEach((el) => el.remove());
     const text = div.textContent || div.innerText || '';
     return { text: text.replace(/\s+/g, ' ').trim(), format: 'HTML' };
   }
 
   // ── DOCX (Word) ──
-  if (['docx'].includes(ext)) {
+  if (ext === 'docx') {
+    const mammoth = await getMammoth();
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer });
     return { text: result.value, format: 'DOCX' };
@@ -45,7 +67,6 @@ export async function extractTextFromAnyFile(file: File): Promise<ExtractionResu
 
   // ── DOC (legacy Word) — try as text, limited support ──
   if (ext === 'doc') {
-    // mammoth doesn't support .doc; try basic text extraction
     const arrayBuffer = await file.arrayBuffer();
     const text = extractTextFromBinary(arrayBuffer);
     if (text.length > 50) {
@@ -56,19 +77,20 @@ export async function extractTextFromAnyFile(file: File): Promise<ExtractionResu
 
   // ── XLSX / XLS (Excel) ──
   if (['xlsx', 'xls'].includes(ext)) {
+    const xlsx = await getXlsx();
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = xlsx.read(arrayBuffer, { type: 'array' });
     const texts: string[] = [];
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
-      const csv = XLSX.utils.sheet_to_csv(sheet);
+      const csv = xlsx.utils.sheet_to_csv(sheet);
       texts.push(`[${sheetName}]\n${csv}`);
     }
     return { text: texts.join('\n\n'), pages: workbook.SheetNames.length, format: ext.toUpperCase() };
   }
 
   // ── PPTX (PowerPoint) ──
-  if (['pptx'].includes(ext)) {
+  if (ext === 'pptx') {
     const arrayBuffer = await file.arrayBuffer();
     const text = await extractPptxText(arrayBuffer);
     return { text, format: 'PPTX' };
@@ -110,21 +132,22 @@ export async function extractTextFromAnyFile(file: File): Promise<ExtractionResu
  * Extract text from PPTX by reading slide XML files inside the ZIP.
  */
 async function extractPptxText(arrayBuffer: ArrayBuffer): Promise<string> {
+  const JSZip = await getJSZip();
   const zip = await JSZip.loadAsync(arrayBuffer);
   const slideTexts: string[] = [];
 
-  // Get all slide files sorted
   const slideFiles = Object.keys(zip.files)
-    .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
     .sort((a, b) => {
-      const numA = parseInt(a.match(/slide(\d+)/)?.[1] || '0');
-      const numB = parseInt(b.match(/slide(\d+)/)?.[1] || '0');
+      const numA = parseInt(a.match(/slide(\d+)/)?.[1] || '0', 10);
+      const numB = parseInt(b.match(/slide(\d+)/)?.[1] || '0', 10);
       return numA - numB;
     });
 
   for (const slidePath of slideFiles) {
-    const xml = await zip.files[slidePath].async('string');
-    // Extract text from <a:t> tags (PowerPoint text runs)
+    const entry = getZipEntry(zip, slidePath);
+    if (!entry) continue;
+    const xml = await entry.async('string');
     const texts = extractXmlTextContent(xml, 'a:t');
     if (texts) {
       const slideNum = slidePath.match(/slide(\d+)/)?.[1] || '?';
@@ -143,18 +166,20 @@ async function extractPptxText(arrayBuffer: ArrayBuffer): Promise<string> {
  * Extract text from EPUB by reading XHTML content files inside the ZIP.
  */
 async function extractEpubText(arrayBuffer: ArrayBuffer): Promise<string> {
+  const JSZip = await getJSZip();
   const zip = await JSZip.loadAsync(arrayBuffer);
   const texts: string[] = [];
 
-  // Find content files (xhtml/html inside the epub)
   const contentFiles = Object.keys(zip.files)
-    .filter(name => /\.(xhtml|html|htm|xml)$/.test(name) && !name.includes('META-INF') && !name.includes('content.opf'))
+    .filter((name) => /\.(xhtml|html|htm|xml)$/.test(name) && !name.includes('META-INF') && !name.includes('content.opf'))
     .sort();
 
   for (const path of contentFiles) {
+    const entry = getZipEntry(zip, path);
+    if (!entry) continue;
+
     try {
-      const content = await zip.files[path].async('string');
-      // Strip XML/HTML tags
+      const content = await entry.async('string');
       const text = content
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -185,14 +210,14 @@ async function extractEpubText(arrayBuffer: ArrayBuffer): Promise<string> {
  * Extract text from ODT by reading content.xml inside the ZIP.
  */
 async function extractOdtText(arrayBuffer: ArrayBuffer): Promise<string> {
+  const JSZip = await getJSZip();
   const zip = await JSZip.loadAsync(arrayBuffer);
-  const contentFile = zip.files['content.xml'];
+  const contentFile = getZipEntry(zip, 'content.xml');
   if (!contentFile) {
     throw new Error('ODT 文件格式异常：缺少 content.xml');
   }
 
   const xml = await contentFile.async('string');
-  // Extract text from <text:p> and similar tags
   const text = xml
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
@@ -205,13 +230,20 @@ async function extractOdtText(arrayBuffer: ArrayBuffer): Promise<string> {
   return text;
 }
 
+function getZipEntry(zip: JSZipInstance, path: string) {
+  const entry = zip.files[path];
+  if (!entry || entry.dir) return null;
+  return entry;
+}
+
 /**
  * Simple XML text content extraction by tag name.
  */
 function extractXmlTextContent(xml: string, tagName: string): string {
-  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'g');
+  const escapedTag = tagName.replace(':', '\\:');
+  const regex = new RegExp(`<${escapedTag}[^>]*>([^<]*)</${escapedTag}>`, 'g');
   const matches: string[] = [];
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = regex.exec(xml)) !== null) {
     if (match[1].trim()) {
       matches.push(match[1].trim());
@@ -230,7 +262,6 @@ function extractTextFromBinary(arrayBuffer: ArrayBuffer): string {
 
   for (let i = 0; i < bytes.length && i < 5_000_000; i++) {
     const byte = bytes[i];
-    // Printable ASCII range + common extended
     if ((byte >= 32 && byte <= 126) || byte === 10 || byte === 13) {
       current += String.fromCharCode(byte);
     } else {

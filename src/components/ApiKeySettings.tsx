@@ -17,6 +17,7 @@ import {
   type TranslationProvider,
   type ProviderType,
   PROVIDER_CONFIGS,
+  buildTranslateRequestBody,
   getProviders,
   saveProviders,
   getActiveProviderConfig,
@@ -280,14 +281,19 @@ function ProviderForm({
     setTesting(true);
     setTestResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('translate', {
-        body: {
-          text: 'Hello',
-          sourceLang: 'en',
-          targetLang: 'zh',
-          customApiKey: apiKey || undefined,
-          customBaseUrl: baseUrl || undefined,
+      const body = buildTranslateRequestBody({
+        text: 'Hello',
+        sourceLang: 'en',
+        targetLang: 'zh',
+        providerConfig: {
+          providerType: type,
+          apiKey: apiKey || undefined,
+          baseUrl: baseUrl || undefined,
+          model: model || undefined,
         },
+      });
+      const { data, error } = await supabase.functions.invoke('translate', {
+        body,
       });
       if (error) throw error;
       if (data?.translatedText) {
@@ -296,9 +302,9 @@ function ProviderForm({
       } else {
         throw new Error('无响应');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setTestResult('error');
-      toast.error(`测试失败: ${err.message || '未知错误'}`);
+      toast.error(`测试失败: ${getErrorMessage(err)}`);
     } finally {
       setTesting(false);
     }
@@ -578,4 +584,9 @@ function ProviderForm({
       </div>
     </div>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return '未知错误';
 }
