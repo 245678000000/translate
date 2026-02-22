@@ -98,38 +98,26 @@ export const PROVIDER_CONFIGS: Record<ProviderType, ProviderTypeConfig> = {
 
 const STORAGE_KEY = 'pdf-translate-providers';
 
-const SYSTEM_PROVIDER: TranslationProvider = {
-  id: 'system-default',
-  name: '系统默认',
-  type: 'openai',
-  enabled: true,
-  isDefault: true,
-  isSystem: true,
-};
-
 export function getProviders(): TranslationProvider[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [{ ...SYSTEM_PROVIDER }];
+    if (!raw) return [];
     const providers = JSON.parse(raw) as TranslationProvider[];
-    // Ensure system provider always exists
-    if (!providers.find(p => p.id === 'system-default')) {
-      providers.unshift({ ...SYSTEM_PROVIDER, isDefault: !providers.some(p => p.isDefault) });
-    }
-    return providers;
+    // Filter out legacy system providers
+    return providers.filter(p => !p.isSystem);
   } catch {
-    return [{ ...SYSTEM_PROVIDER }];
+    return [];
   }
 }
 
 export function saveProviders(providers: TranslationProvider[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(providers));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(providers.filter(p => !p.isSystem)));
 }
 
 export function getDefaultProvider(): TranslationProvider | null {
   const providers = getProviders();
   const defaultP = providers.find(p => p.isDefault && p.enabled);
-  if (defaultP && !defaultP.isSystem && defaultP.apiKey) return defaultP;
+  if (defaultP && defaultP.apiKey) return defaultP;
   return null;
 }
 
