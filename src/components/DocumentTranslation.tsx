@@ -10,37 +10,23 @@ import { exportTranslatedPDF, type TranslatedPage } from '@/lib/pdf-export';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { getActiveProviderConfig, getDefaultProvider } from '@/lib/providers';
+import { extractTextFromAnyFile } from '@/lib/file-extract';
 
 type DocState = 'upload' | 'translating' | 'done';
 
 async function extractTextFromFile(file: File): Promise<{ text: string; pages?: PDFInfo }> {
   const ext = file.name.toLowerCase().split('.').pop() || '';
+
+  // PDF — use existing pdf.js for page-level layout data
   if (ext === 'pdf') {
     const info = await extractPDFContent(file);
     const text = info.pages.map(p => p.text).join('\n\n');
     return { text, pages: info };
   }
-  if (['txt', 'md', 'csv', 'json', 'html', 'htm', 'rtf'].includes(ext)) {
-    const text = await file.text();
-    if (['html', 'htm'].includes(ext)) {
-      const div = document.createElement('div');
-      div.innerHTML = text;
-      return { text: div.textContent || div.innerText || '' };
-    }
-    return { text };
-  }
-  if (['docx', 'pptx', 'xlsx', 'odt', 'epub'].includes(ext)) {
-    try {
-      const text = await file.text();
-      const stripped = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (stripped.length > 20) return { text: stripped };
-    } catch { /* fall through */ }
-    throw new Error(`暂不支持直接解析 .${ext} 格式，请转换为 PDF 或 TXT 后重试`);
-  }
-  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
-    throw new Error('图片 OCR 识别功能即将上线，请先转换为 PDF 或 TXT');
-  }
-  throw new Error(`不支持的文件格式: .${ext}`);
+
+  // All other formats — robust client-side extraction
+  const result = await extractTextFromAnyFile(file);
+  return { text: result.text };
 }
 
 export function DocumentTranslation() {
