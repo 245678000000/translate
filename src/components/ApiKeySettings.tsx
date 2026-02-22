@@ -95,7 +95,7 @@ export function ApiKeySettings({ onKeyChange }: { onKeyChange?: (hasKey: boolean
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg sm:max-h-[85vh] overflow-y-auto [&>button:last-child]:hidden">
+      <DialogContent className="sm:max-w-[560px] sm:max-h-[90vh] overflow-y-auto [&>button:last-child]:hidden sm:p-6">
         {view === 'list' && (
           <ProviderList
             providers={providers}
@@ -136,12 +136,14 @@ function ProviderList({
 
   return (
     <>
-      <DialogHeader className="pr-0">
-        <div className="flex items-center justify-between gap-3 h-10">
-          <DialogTitle className="shrink-0">翻译服务提供商</DialogTitle>
-          <DialogDescription className="hidden sm:block flex-1 text-right truncate">
-            管理你的翻译服务提供商，翻译时将优先使用默认提供商
-          </DialogDescription>
+      <DialogHeader className="pr-0 pb-4 border-b border-border">
+        <div className="flex items-start sm:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0 space-y-1">
+            <DialogTitle className="text-xl font-semibold">翻译服务提供商</DialogTitle>
+            <DialogDescription className="text-sm">
+              管理你的翻译服务提供商，翻译时将优先使用默认提供商
+            </DialogDescription>
+          </div>
           <div className="flex items-center gap-3 shrink-0">
             <Button size="sm" onClick={onAdd} className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90">
               <Plus className="w-4 h-4" />
@@ -159,9 +161,6 @@ function ProviderList({
             </button>
           </div>
         </div>
-        <DialogDescription className="sm:hidden">
-          管理你的翻译服务提供商，翻译时将优先使用默认提供商
-        </DialogDescription>
       </DialogHeader>
 
       {isEmpty ? (
@@ -181,14 +180,14 @@ function ProviderList({
           </Button>
         </div>
       ) : (
-        <div className="space-y-2 pt-2">
+        <div className="space-y-3 pt-4">
           {userProviders.map((p) => {
             const config = PROVIDER_CONFIGS[p.type] || PROVIDER_CONFIGS.custom;
             return (
               <div
                 key={p.id}
                 className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl border transition-colors',
+                  'flex items-center gap-3 p-4 rounded-2xl border transition-colors',
                   p.isDefault ? 'border-primary/30 bg-primary/[0.04]' : 'border-border'
                 )}
               >
