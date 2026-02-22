@@ -39,6 +39,7 @@ export function TextTranslation() {
       if (keyConfig?.apiKey) {
         body.customApiKey = keyConfig.apiKey;
         if (keyConfig.baseUrl) body.customBaseUrl = keyConfig.baseUrl;
+        if (keyConfig.providerType) body.providerType = keyConfig.providerType;
       }
 
       const { data, error } = await supabase.functions.invoke('translate', { body });

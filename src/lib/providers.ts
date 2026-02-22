@@ -18,6 +18,8 @@ export type ProviderType =
   | 'ollama'
   | 'deepseek'
   | 'qwen'
+  | 'microsoft'
+  | 'google-translate'
   | 'custom';
 
 export interface ProviderTypeConfig {
@@ -86,6 +88,22 @@ export const PROVIDER_CONFIGS: Record<ProviderType, ProviderTypeConfig> = {
     models: ['qwen-turbo', 'qwen-plus', 'qwen-max'],
     fields: ['apiKey', 'baseUrl', 'model'],
   },
+  microsoft: {
+    label: 'Microsoft Translator',
+    icon: 'M',
+    color: 'hsl(200 80% 45%)',
+    defaultBaseUrl: 'https://api.cognitive.microsofttranslator.com',
+    models: [],
+    fields: ['apiKey', 'baseUrl'],
+  },
+  'google-translate': {
+    label: 'Google Cloud Translation',
+    icon: 'G',
+    color: 'hsl(140 60% 45%)',
+    defaultBaseUrl: 'https://translation.googleapis.com',
+    models: [],
+    fields: ['apiKey'],
+  },
   custom: {
     label: '自定义兼容API',
     icon: '⚙',
@@ -122,8 +140,8 @@ export function getDefaultProvider(): TranslationProvider | null {
 }
 
 // Backward-compatible: used by TextTranslation & DocumentTranslation
-export function getActiveProviderConfig(): { apiKey?: string; baseUrl?: string } | null {
+export function getActiveProviderConfig(): { apiKey?: string; baseUrl?: string; providerType?: string } | null {
   const p = getDefaultProvider();
   if (!p) return null;
-  return { apiKey: p.apiKey, baseUrl: p.baseUrl };
+  return { apiKey: p.apiKey, baseUrl: p.baseUrl, providerType: p.type };
 }
