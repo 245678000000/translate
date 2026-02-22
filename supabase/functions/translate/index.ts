@@ -8,6 +8,9 @@ const corsHeaders = {
 
 const MAX_TEXT_LENGTH = 50000;
 const DEFAULT_AZURE_API_VERSION = "2024-10-21";
+const DEFAULT_PUBLIC_DEEPLX_URL =
+  Deno.env.get("PUBLIC_DEEPLX_URL") ||
+  "https://api.deeplx.org/2oOH_1kOqGsNR11IOjBhsfqciIO6_sw4566doJsR1Xg/translate";
 
 type ProviderType =
   | "openai"
@@ -446,20 +449,8 @@ async function translateWithDeepLX(
   return getDeepLXContent(data);
 }
 
-async function translateWithLovableDefaultService(text: string, sourceLang: string, targetLang: string): Promise<string> {
-  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!lovableApiKey) {
-    throw new Error("DEFAULT_TRANSLATION_SERVICE_UNAVAILABLE");
-  }
-
-  return translateWithOpenAICompatible({
-    text,
-    sourceLang,
-    targetLang,
-    apiUrl: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    apiKey: lovableApiKey,
-    model: "google/gemini-3-flash-preview",
-  });
+async function translateWithPublicDefaultService(text: string, sourceLang: string, targetLang: string): Promise<string> {
+  return translateWithDeepLX(text, sourceLang, targetLang, DEFAULT_PUBLIC_DEEPLX_URL);
 }
 
 serve(async (req) => {
@@ -512,7 +503,7 @@ serve(async (req) => {
     let translatedText = "";
 
     if (!providerType && !customApiKey && !customBaseUrl) {
-      translatedText = await translateWithLovableDefaultService(text, src, tgt);
+      translatedText = await translateWithPublicDefaultService(text, src, tgt);
     } else {
       const resolvedProvider: ProviderType = providerType || "openai";
       const resolvedModel = resolveModel(resolvedProvider, model);
@@ -561,16 +552,11 @@ serve(async (req) => {
     );
   } catch (e: unknown) {
     const message = toErrorMessage(e, "Unknown error");
-    const status = message === "DEFAULT_TRANSLATION_SERVICE_UNAVAILABLE" ? 503 : 500;
-    const errorMessage = message === "DEFAULT_TRANSLATION_SERVICE_UNAVAILABLE"
-      ? "默认翻译服务暂不可用，请配置自定义提供商后重试"
-      : message;
-
     console.error("translate error:", e);
 
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
