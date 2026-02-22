@@ -43,18 +43,14 @@ export function ApiKeySettings({ onKeyChange }: { onKeyChange?: (hasKey: boolean
   }, [open]);
 
   const persist = useCallback((updated: TranslationProvider[]) => {
-    setProviders(updated);
-    saveProviders(updated);
-    onKeyChange?.(updated.some(p => !p.isSystem && p.isDefault && p.enabled && p.apiKey));
+    const filtered = updated.filter(p => !p.isSystem);
+    setProviders(filtered);
+    saveProviders(filtered);
+    onKeyChange?.(filtered.some(p => p.isDefault && p.enabled && p.apiKey));
   }, [onKeyChange]);
 
   const handleDelete = (id: string) => {
     const updated = providers.filter(p => p.id !== id);
-    // If deleted was default, set system as default
-    if (!updated.some(p => p.isDefault)) {
-      const sys = updated.find(p => p.isSystem);
-      if (sys) sys.isDefault = true;
-    }
     persist(updated);
     toast.success('已删除');
   };
@@ -135,6 +131,9 @@ function ProviderList({
   onDelete: (id: string) => void;
   onSetDefault: (id: string) => void;
 }) {
+  const userProviders = providers.filter(p => !p.isSystem);
+  const isEmpty = userProviders.length === 0;
+
   return (
     <>
       <DialogHeader>
@@ -150,67 +149,71 @@ function ProviderList({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-2 pt-2">
-        {providers.map((p) => {
-          const config = PROVIDER_CONFIGS[p.type] || PROVIDER_CONFIGS.custom;
-          return (
-            <div
-              key={p.id}
-              className={cn(
-                'flex items-center gap-3 p-3 rounded-xl border transition-colors',
-                p.isDefault ? 'border-primary/30 bg-primary/[0.04]' : 'border-border'
-              )}
-            >
-              {/* Icon */}
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center py-10 space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <span className="text-3xl">🌐</span>
+          </div>
+          <div className="text-center space-y-1.5">
+            <p className="font-semibold text-foreground">暂无翻译服务提供商</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              添加自己的 API Key 后，翻译将更稳定、更便宜、更安全
+            </p>
+          </div>
+          <Button onClick={onAdd} className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90 mt-2">
+            <Plus className="w-4 h-4" />
+            添加提供商
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2 pt-2">
+          {userProviders.map((p) => {
+            const config = PROVIDER_CONFIGS[p.type] || PROVIDER_CONFIGS.custom;
+            return (
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
-                style={{ backgroundColor: `${config.color}20`, color: config.color }}
+                key={p.id}
+                className={cn(
+                  'flex items-center gap-3 p-3 rounded-xl border transition-colors',
+                  p.isDefault ? 'border-primary/30 bg-primary/[0.04]' : 'border-border'
+                )}
               >
-                {config.icon}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm text-foreground truncate">{p.name}</span>
-                  {p.isDefault && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                      默认
-                    </span>
-                  )}
-                  {p.isSystem && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
-                      系统
-                    </span>
-                  )}
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
+                  style={{ backgroundColor: `${config.color}20`, color: config.color }}
+                >
+                  {config.icon}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {config.label}{p.model ? ` · ${p.model}` : ''}
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1 shrink-0">
-                {!p.isDefault && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onSetDefault(p.id)} title="设为默认">
-                    <Star className="w-3.5 h-3.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm text-foreground truncate">{p.name}</span>
+                    {p.isDefault && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                        默认
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {config.label}{p.model ? ` · ${p.model}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {!p.isDefault && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onSetDefault(p.id)} title="设为默认">
+                      <Star className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(p)} title="编辑">
+                    <Pencil className="w-3.5 h-3.5" />
                   </Button>
-                )}
-                {!p.isSystem && (
-                  <>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(p)} title="编辑">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(p.id)} title="删除">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </>
-                )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(p.id)} title="删除">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground pt-2">
         未设置自定义提供商时，将使用系统默认服务进行翻译
