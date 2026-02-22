@@ -237,7 +237,7 @@ function ProviderList({
   );
 }
 
-/* ────── Provider Form (Add/Edit) — DeepLX style ────── */
+/* ────── Provider Form (Add/Edit) — Unified DeepLX style ────── */
 function ProviderForm({
   provider,
   onSave,
@@ -259,7 +259,14 @@ function ProviderForm({
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [typeOpen, setTypeOpen] = useState(false);
 
+  // Advanced fields
+  const [maxRps, setMaxRps] = useState(provider?.maxRequestsPerSecond ?? 5);
+  const [maxTextLen, setMaxTextLen] = useState(provider?.maxTextLength ?? 5000);
+  const [maxParas, setMaxParas] = useState(provider?.maxParagraphs ?? 50);
+  const [richText, setRichText] = useState(provider?.enableRichText ?? false);
+
   const config = PROVIDER_CONFIGS[type];
+  const hasAdvanced = config.advancedFields && config.advancedFields.length > 0;
 
   useEffect(() => {
     if (!isEdit) {
@@ -311,6 +318,12 @@ function ProviderForm({
       model: model.trim() || undefined,
       enabled: true,
       isDefault: provider?.isDefault || false,
+      ...(hasAdvanced ? {
+        maxRequestsPerSecond: maxRps,
+        maxTextLength: maxTextLen,
+        maxParagraphs: maxParas,
+        enableRichText: richText,
+      } : {}),
     });
   };
 
@@ -319,7 +332,6 @@ function ProviderForm({
 
   return (
     <div className="space-y-5">
-      {/* Accessible title for Radix (visually hidden) */}
       <DialogTitle className="sr-only">{isEdit ? '编辑' : '添加'}提供商</DialogTitle>
       <DialogDescription className="sr-only">配置翻译服务提供商</DialogDescription>
 
@@ -428,9 +440,10 @@ function ProviderForm({
             placeholder={config.defaultBaseUrl || 'https://api.example.com/v1/chat/completions'}
           />
           {baseUrl.trim() && (
-            <p className="text-xs text-muted-foreground truncate" style={{ color: '#64748b' }}>
+            <p className="text-xs text-muted-foreground truncate">
               预览: {(() => {
                 const url = baseUrl.trim().replace(/\/+$/, '');
+                if (type === 'deeplx' || type === 'microsoft' || type === 'google-translate') return url;
                 if (url.endsWith('/chat/completions')) return url;
                 if (url.endsWith('/v1')) return `${url}/chat/completions`;
                 if (url.match(/\/v\d+$/)) return `${url}/chat/completions`;
@@ -486,6 +499,75 @@ function ProviderForm({
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
+          )}
+        </div>
+      )}
+
+      {/* ── Advanced fields (DeepLX etc.) ── */}
+      {hasAdvanced && (
+        <div className="space-y-4 pt-3 border-t border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">高级参数</p>
+
+          {config.advancedFields!.includes('maxRequestsPerSecond') && (
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground">每秒最大请求数：</label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={maxRps}
+                onChange={(e) => setMaxRps(Number(e.target.value))}
+              />
+            </div>
+          )}
+
+          {config.advancedFields!.includes('maxTextLength') && (
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground">每次请求最大文本长度：</label>
+              <Input
+                type="number"
+                min={100}
+                max={50000}
+                value={maxTextLen}
+                onChange={(e) => setMaxTextLen(Number(e.target.value))}
+              />
+            </div>
+          )}
+
+          {config.advancedFields!.includes('maxParagraphs') && (
+            <div className="space-y-1.5">
+              <label className="text-sm text-muted-foreground">每次请求最大段落数：</label>
+              <Input
+                type="number"
+                min={1}
+                max={500}
+                value={maxParas}
+                onChange={(e) => setMaxParas(Number(e.target.value))}
+              />
+            </div>
+          )}
+
+          {config.advancedFields!.includes('enableRichText') && (
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-muted-foreground">启用富文本翻译：</label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={richText}
+                onClick={() => setRichText(!richText)}
+                className={cn(
+                  'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+                  richText ? 'bg-primary' : 'bg-muted'
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform',
+                    richText ? 'translate-x-5' : 'translate-x-0'
+                  )}
+                />
+              </button>
+            </div>
           )}
         </div>
       )}

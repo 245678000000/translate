@@ -8,6 +8,10 @@ export interface TranslationProvider {
   enabled: boolean;
   isDefault: boolean;
   isSystem?: boolean;
+  maxRequestsPerSecond?: number;
+  maxTextLength?: number;
+  maxParagraphs?: number;
+  enableRichText?: boolean;
 }
 
 export type ProviderType =
@@ -18,6 +22,7 @@ export type ProviderType =
   | 'ollama'
   | 'deepseek'
   | 'qwen'
+  | 'deeplx'
   | 'microsoft'
   | 'google-translate'
   | 'custom';
@@ -29,6 +34,7 @@ export interface ProviderTypeConfig {
   defaultBaseUrl: string;
   models: string[];
   fields: ('apiKey' | 'baseUrl' | 'model')[];
+  advancedFields?: ('maxRequestsPerSecond' | 'maxTextLength' | 'maxParagraphs' | 'enableRichText')[];
 }
 
 export const PROVIDER_CONFIGS: Record<ProviderType, ProviderTypeConfig> = {
@@ -87,6 +93,15 @@ export const PROVIDER_CONFIGS: Record<ProviderType, ProviderTypeConfig> = {
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
     models: ['qwen-turbo', 'qwen-plus', 'qwen-max'],
     fields: ['apiKey', 'baseUrl', 'model'],
+  },
+  deeplx: {
+    label: 'DeepL X',
+    icon: 'lx',
+    color: 'hsl(220 70% 50%)',
+    defaultBaseUrl: 'https://api.deeplx.org/translate',
+    models: [],
+    fields: ['baseUrl'],
+    advancedFields: ['maxRequestsPerSecond', 'maxTextLength', 'maxParagraphs', 'enableRichText'],
   },
   microsoft: {
     label: 'Microsoft Translator',
