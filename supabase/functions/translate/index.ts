@@ -1,10 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const MAX_TEXT_LENGTH = 50000;
+
+const VALID_LANGS = new Set([
+  "auto", "zh", "en", "ja", "ko", "fr", "de", "es", "pt", "it", "ru", "ar",
+  "th", "vi", "id", "ms", "hi", "tr", "pl", "nl", "sv", "da", "fi", "no",
+  "uk", "cs", "ro", "el", "hu", "bg",
+]);
 
 const langMap: Record<string, string> = {
   auto: "auto-detect the source language",
@@ -146,7 +155,7 @@ serve(async (req) => {
     const {
       text, sourceLang, targetLang,
       customApiKey, customBaseUrl,
-      providerType, // 'microsoft' | 'google-translate' | 'openai' | etc.
+      providerType,
     } = await req.json();
 
     if (!text) {
@@ -154,6 +163,54 @@ serve(async (req) => {
         JSON.stringify({ error: "Missing text" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (typeof text !== "string" || text.length > MAX_TEXT_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Text exceeds maximum length of ${MAX_TEXT_LENGTH.toLocaleString()} characters` }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (sourceLang && !VALID_LANGS.has(sourceLang)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid source language" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (targetLang && !VALID_LANGS.has(targetLang)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid target language" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // When using the default Lovable AI service (no custom key), require auth
+    const usingDefaultService = !customApiKey;
+    if (usingDefaultService) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(
+          JSON.stringify({ error: "Authorization required" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const token = authHeader.replace("Bearer ", "");
+      const { data, error: authError } = await supabaseClient.auth.getClaims(token);
+      if (authError || !data?.claims) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     let translatedText: string;
