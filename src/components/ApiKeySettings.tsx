@@ -103,6 +103,7 @@ export function ApiKeySettings({ onKeyChange }: { onKeyChange?: (hasKey: boolean
             onEdit={openEdit}
             onDelete={handleDelete}
             onSetDefault={handleSetDefault}
+            onClose={() => setOpen(false)}
           />
         )}
         {(view === 'add' || view === 'edit') && (
@@ -124,12 +125,14 @@ function ProviderList({
   onEdit,
   onDelete,
   onSetDefault,
+  onClose,
 }: {
   providers: TranslationProvider[];
   onAdd: () => void;
   onEdit: (p: TranslationProvider) => void;
   onDelete: (id: string) => void;
   onSetDefault: (id: string) => void;
+  onClose: () => void;
 }) {
   const userProviders = providers.filter(p => !p.isSystem);
   const isEmpty = userProviders.length === 0;
@@ -150,14 +153,11 @@ function ProviderList({
               添加
             </Button>
             <button
-              onClick={() => {
-                const dialog = document.querySelector('[data-state="open"][role="dialog"]');
-                const closeBtn = dialog?.querySelector('[data-radix-collection-item]') as HTMLElement;
-                closeBtn?.click();
-              }}
-              className="w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200 hover:scale-110"
+              type="button"
+              onClick={onClose}
+              className="w-11 h-11 sm:w-7 sm:h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200 hover:scale-110 z-50"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
         </div>
