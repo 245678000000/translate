@@ -5,12 +5,12 @@
 
 type MammothModule = typeof import('mammoth');
 type XlsxModule = typeof import('xlsx');
-type JSZipModule = typeof import('jszip');
-type JSZipInstance = InstanceType<JSZipModule['default']>;
+type JSZipDefault = import('jszip');
+type JSZipInstance = JSZipDefault;
 
 let mammothPromise: Promise<MammothModule> | null = null;
 let xlsxPromise: Promise<XlsxModule> | null = null;
-let jszipPromise: Promise<JSZipModule> | null = null;
+let jszipPromise: Promise<any> | null = null;
 
 export interface ExtractionResult {
   text: string;
@@ -28,10 +28,10 @@ async function getXlsx(): Promise<XlsxModule> {
   return xlsxPromise;
 }
 
-async function getJSZip(): Promise<JSZipModule['default']> {
+async function getJSZip(): Promise<JSZipDefault> {
   if (!jszipPromise) jszipPromise = import('jszip');
-  const module = await jszipPromise;
-  return module.default;
+  const mod = await jszipPromise;
+  return (mod as any).default ?? mod;
 }
 
 /**
