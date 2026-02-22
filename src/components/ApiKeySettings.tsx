@@ -95,7 +95,7 @@ export function ApiKeySettings({ onKeyChange }: { onKeyChange?: (hasKey: boolean
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto [&>button:last-child]:hidden">
         {view === 'list' && (
           <ProviderList
             providers={providers}
@@ -136,15 +136,30 @@ function ProviderList({
 
   return (
     <>
-      <DialogHeader>
-        <div className="flex items-center justify-between">
-          <DialogTitle>翻译服务提供商</DialogTitle>
-          <Button size="sm" onClick={onAdd} className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90">
-            <Plus className="w-4 h-4" />
-            添加
-          </Button>
+      <DialogHeader className="pr-0">
+        <div className="flex items-center justify-between gap-3 h-10">
+          <DialogTitle className="shrink-0">翻译服务提供商</DialogTitle>
+          <DialogDescription className="hidden sm:block flex-1 text-right truncate">
+            管理你的翻译服务提供商，翻译时将优先使用默认提供商
+          </DialogDescription>
+          <div className="flex items-center gap-3 shrink-0">
+            <Button size="sm" onClick={onAdd} className="gap-1.5 bg-gradient-to-r from-primary to-accent hover:opacity-90">
+              <Plus className="w-4 h-4" />
+              添加
+            </Button>
+            <button
+              onClick={() => {
+                const dialog = document.querySelector('[data-state="open"][role="dialog"]');
+                const closeBtn = dialog?.querySelector('[data-radix-collection-item]') as HTMLElement;
+                closeBtn?.click();
+              }}
+              className="w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200 hover:scale-110"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-        <DialogDescription>
+        <DialogDescription className="sm:hidden">
           管理你的翻译服务提供商，翻译时将优先使用默认提供商
         </DialogDescription>
       </DialogHeader>
