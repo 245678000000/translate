@@ -95,7 +95,7 @@ export function ApiKeySettings({ onKeyChange }: { onKeyChange?: (hasKey: boolean
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto [&>button:last-child]:hidden">
+      <DialogContent className="sm:max-w-lg sm:max-h-[85vh] overflow-y-auto [&>button:last-child]:hidden">
         {view === 'list' && (
           <ProviderList
             providers={providers}

@@ -132,10 +132,10 @@ export function MultiFileUpload({ files, onFilesChange }: MultiFileUploadProps) 
         onClick={() => inputRef.current?.click()}
         className={cn(
           'relative flex flex-col items-center justify-center w-full rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-300',
-          hasFiles ? 'h-32' : 'h-52',
+          hasFiles ? 'h-28 sm:h-32' : 'h-40 sm:h-52',
           isDragging
-            ? 'border-primary bg-primary/[0.06] scale-[1.02]'
-            : 'border-primary/20 bg-primary/[0.02] hover:border-primary/50 hover:bg-primary/[0.06]'
+            ? 'border-primary bg-primary/[0.06] scale-[1.01] sm:scale-[1.02]'
+            : 'border-primary/20 bg-primary/[0.02] hover:border-primary/50 hover:bg-primary/[0.06] active:bg-primary/[0.08]'
         )}
       >
         <input
@@ -154,11 +154,11 @@ export function MultiFileUpload({ files, onFilesChange }: MultiFileUploadProps) 
             <ArrowUpFromLine className={cn(hasFiles ? "w-5 h-5" : "w-7 h-7", "text-primary")} />
           </div>
           <div className="text-center">
-            <p className={cn("font-semibold text-foreground", hasFiles ? "text-sm" : "text-base")}>
-              {hasFiles ? '继续添加文件' : '拖拽文档到此处'}
+            <p className={cn("font-semibold text-foreground", hasFiles ? "text-sm" : "text-base sm:text-lg")}>
+              {hasFiles ? '继续添加文件' : '点击选择或拖拽文档'}
             </p>
             {!hasFiles && (
-              <p className="text-sm text-muted-foreground mt-1">或点击选择文件</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">支持多文件同时上传</p>
             )}
           </div>
         </div>
@@ -178,9 +178,9 @@ export function MultiFileUpload({ files, onFilesChange }: MultiFileUploadProps) 
             exit={{ opacity: 0, height: 0 }}
             className="space-y-2"
           >
-            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-              <span>{files.length} 个文件 · 共 {formatSize(totalSize)}</span>
-              <span>最多 {MAX_FILES} 个 · 总大小 ≤ 100MB</span>
+            <div className="flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground px-1">
+              <span>{files.length} 个文件 · {formatSize(totalSize)}</span>
+              <span className="hidden sm:inline">最多 {MAX_FILES} 个 · ≤ 100MB</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -206,9 +206,9 @@ export function MultiFileUpload({ files, onFilesChange }: MultiFileUploadProps) 
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); removeFile(uf.id); }}
-                      className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      className="p-2 sm:p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                   </motion.div>
                 );
