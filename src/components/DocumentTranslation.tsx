@@ -2,32 +2,26 @@ import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { MultiFileUpload, type UploadedFile } from '@/components/MultiFileUpload';
-import { TranslationProgress } from '@/components/TranslationProgress';
-import { TranslationResult } from '@/components/TranslationResult';
+import { TranslationProgress, type FileProgress, type FileTranslationStage } from '@/components/TranslationProgress';
 import { LanguageDropdown } from '@/components/LanguageDropdown';
 import { ArrowRight } from 'lucide-react';
 import { extractPDFContent, groupIntoParagraphs, type PDFInfo } from '@/lib/pdf-utils';
 import { exportTranslatedPDF, type TranslatedPage } from '@/lib/pdf-export';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { getActiveProviderConfig } from '@/lib/providers';
+import { getActiveProviderConfig, getDefaultProvider } from '@/lib/providers';
 
 type DocState = 'upload' | 'translating' | 'done';
 
 async function extractTextFromFile(file: File): Promise<{ text: string; pages?: PDFInfo }> {
   const ext = file.name.toLowerCase().split('.').pop() || '';
-
-  // PDF — use existing pdf.js extraction
   if (ext === 'pdf') {
     const info = await extractPDFContent(file);
     const text = info.pages.map(p => p.text).join('\n\n');
     return { text, pages: info };
   }
-
-  // Plain text formats
   if (['txt', 'md', 'csv', 'json', 'html', 'htm', 'rtf'].includes(ext)) {
     const text = await file.text();
-    // Strip HTML tags for .html/.htm
     if (['html', 'htm'].includes(ext)) {
       const div = document.createElement('div');
       div.innerHTML = text;
@@ -35,25 +29,17 @@ async function extractTextFromFile(file: File): Promise<{ text: string; pages?: 
     }
     return { text };
   }
-
-  // For binary office formats (docx/pptx/xlsx/epub/odt) — read as text fallback
-  // In a production app these would use server-side parsing; for now extract what we can
   if (['docx', 'pptx', 'xlsx', 'odt', 'epub'].includes(ext)) {
     try {
-      // Try reading as text (works for some XML-based formats)
       const text = await file.text();
-      // Extract text content from XML
       const stripped = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       if (stripped.length > 20) return { text: stripped };
     } catch { /* fall through */ }
     throw new Error(`暂不支持直接解析 .${ext} 格式，请转换为 PDF 或 TXT 后重试`);
   }
-
-  // Images — placeholder for OCR (would need server-side OCR)
   if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
     throw new Error('图片 OCR 识别功能即将上线，请先转换为 PDF 或 TXT');
   }
-
   throw new Error(`不支持的文件格式: .${ext}`);
 }
 
@@ -62,54 +48,76 @@ export function DocumentTranslation() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [sourceLang, setSourceLang] = useState('auto');
   const [targetLang, setTargetLang] = useState('en');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [currentPreview, setCurrentPreview] = useState('');
+  const [fileProgresses, setFileProgresses] = useState<FileProgress[]>([]);
   const [translatedPages, setTranslatedPages] = useState<TranslatedPage[]>([]);
-  const [activeFileName, setActiveFileName] = useState('');
-  const [hasCustomKey] = useState(() => !!getActiveProviderConfig());
   const cancelRef = useRef(false);
   const [lastPdfFile, setLastPdfFile] = useState<File | null>(null);
 
+  const providerName = (() => {
+    const p = getDefaultProvider();
+    return p ? p.name : '系统默认';
+  })();
+
+  const updateFileProgress = (id: string, updates: Partial<FileProgress>) => {
+    setFileProgresses(prev => prev.map(fp => fp.id === id ? { ...fp, ...updates } : fp));
+  };
+
+  const overallProgress = fileProgresses.length > 0
+    ? fileProgresses.reduce((sum, fp) => sum + fp.progress, 0) / fileProgresses.length
+    : 0;
+
+  const estimatedTimeLeft = Math.max(0, ((100 - overallProgress) / 100) * files.reduce((t, f) => t + Math.ceil(f.file.size / 1024 / 50), 0));
+
   const startTranslation = useCallback(async () => {
     if (files.length === 0) return;
-    setState('translating');
     cancelRef.current = false;
+
+    // Init file progresses
+    const initProgresses: FileProgress[] = files.map(uf => ({
+      id: uf.id,
+      name: uf.file.name,
+      size: uf.file.size,
+      category: uf.type,
+      progress: 0,
+      stage: 'reading' as FileTranslationStage,
+    }));
+    setFileProgresses(initProgresses);
     setTranslatedPages([]);
+    setState('translating');
 
     const allResults: TranslatedPage[] = [];
     let pageOffset = 0;
 
-    // Calculate total "pages" (1 per file for non-PDF, actual pages for PDF)
-    let total = 0;
-    for (const uf of files) {
-      total += uf.type === 'pdf' ? 1 : 1; // We'll update for PDFs during extraction
-    }
-    setTotalPages(files.length);
-
     for (let fi = 0; fi < files.length; fi++) {
       if (cancelRef.current) break;
       const uf = files[fi];
-      setActiveFileName(uf.file.name);
-      setCurrentPage(fi + 1);
+
+      // Stage: reading
+      updateFileProgress(uf.id, { stage: 'reading', progress: 5 });
+      await delay(300);
 
       try {
+        // Stage: extracting
+        updateFileProgress(uf.id, { stage: 'extracting', progress: 15 });
         const { text, pages: pdfInfo } = await extractTextFromFile(uf.file);
 
         if (!text.trim()) {
+          updateFileProgress(uf.id, { stage: 'error', progress: 0 });
           toast.error(`${uf.file.name}: 无法提取文本内容`);
           continue;
         }
 
-        if (pdfInfo) {
-          // PDF: translate page by page
-          setTotalPages(prev => prev - 1 + pdfInfo.numPages);
-          setLastPdfFile(uf.file);
+        // Stage: translating
+        updateFileProgress(uf.id, { stage: 'translating', progress: 30 });
 
-          for (let i = 0; i < pdfInfo.pages.length; i++) {
+        if (pdfInfo) {
+          setLastPdfFile(uf.file);
+          const pageCount = pdfInfo.pages.length;
+          for (let i = 0; i < pageCount; i++) {
             if (cancelRef.current) break;
             const page = pdfInfo.pages[i];
-            setCurrentPage(fi + 1 + i);
+            const pct = 30 + ((i + 1) / pageCount) * 50;
+            updateFileProgress(uf.id, { progress: pct });
 
             if (!page.text.trim()) {
               allResults.push({ pageNumber: pageOffset + page.pageNumber, originalText: '', translatedText: '', pageWidth: page.width, pageHeight: page.height });
@@ -126,11 +134,10 @@ export function DocumentTranslation() {
               pageHeight: page.height,
               paragraphs,
             });
-            setCurrentPreview(translated);
           }
           pageOffset += pdfInfo.numPages;
         } else {
-          // Non-PDF: translate as single block
+          updateFileProgress(uf.id, { progress: 50 });
           const translated = await translateText(text, sourceLang, targetLang);
           allResults.push({
             pageNumber: pageOffset + 1,
@@ -139,12 +146,19 @@ export function DocumentTranslation() {
             pageWidth: 595,
             pageHeight: 842,
           });
-          setCurrentPreview(translated);
           pageOffset += 1;
           setLastPdfFile(uf.file);
         }
+
+        // Stage: generating
+        updateFileProgress(uf.id, { stage: 'generating', progress: 85 });
+        await delay(400);
+
+        // Stage: done
+        updateFileProgress(uf.id, { stage: 'done', progress: 100 });
       } catch (err: any) {
         if (cancelRef.current) break;
+        updateFileProgress(uf.id, { stage: 'error', progress: 0 });
         toast.error(`${uf.file.name}: ${err.message || '处理失败'}`);
       }
     }
@@ -158,8 +172,7 @@ export function DocumentTranslation() {
   const handleCancel = () => {
     cancelRef.current = true;
     setState('upload');
-    setCurrentPage(0);
-    setCurrentPreview('');
+    setFileProgresses([]);
   };
 
   const handleExport = async () => {
@@ -174,9 +187,7 @@ export function DocumentTranslation() {
     setState('upload');
     setFiles([]);
     setTranslatedPages([]);
-    setCurrentPage(0);
-    setCurrentPreview('');
-    setActiveFileName('');
+    setFileProgresses([]);
   };
 
   const estimatedTime = Math.max(15, files.reduce((t, f) => t + Math.ceil(f.file.size / 1024 / 50), 0));
@@ -198,14 +209,12 @@ export function DocumentTranslation() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-5"
             >
-              {/* Language selectors */}
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <LanguageDropdown value={sourceLang} onChange={setSourceLang} showAuto label="源语言" />
                 <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
                 <LanguageDropdown value={targetLang} onChange={setTargetLang} label="目标语言" />
               </div>
 
-              {/* Time estimate */}
               <p className="text-center text-xs text-muted-foreground">
                 预计处理时间：约 {estimatedTime} 秒（共 {files.length} 个文件）
               </p>
@@ -224,32 +233,24 @@ export function DocumentTranslation() {
         </>
       )}
 
-      {state === 'translating' && (
-        <div className="space-y-2">
-          {activeFileName && (
-            <p className="text-center text-xs text-muted-foreground">
-              正在处理：{activeFileName}
-            </p>
-          )}
-          <TranslationProgress
-            currentPage={currentPage}
-            totalPages={totalPages}
-            currentText={currentPreview}
-            onCancel={handleCancel}
-            usingCustomKey={hasCustomKey}
-          />
-        </div>
-      )}
-
-      {state === 'done' && (
-        <TranslationResult
-          pages={translatedPages}
-          onExport={handleExport}
+      {(state === 'translating' || state === 'done') && (
+        <TranslationProgress
+          files={fileProgresses}
+          overallProgress={overallProgress}
+          estimatedTimeLeft={estimatedTimeLeft}
+          providerName={providerName}
+          isComplete={state === 'done'}
+          onCancel={handleCancel}
+          onDownloadAll={handleExport}
           onReset={handleReset}
         />
       )}
     </motion.div>
   );
+}
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function translateText(text: string, sourceLang: string, targetLang: string): Promise<string> {
