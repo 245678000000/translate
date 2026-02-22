@@ -88,7 +88,7 @@ export function TranslationProgress({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="w-full max-w-2xl mx-auto space-y-6"
+      className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-6"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -101,11 +101,11 @@ export function TranslationProgress({
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center gap-2"
               >
-                <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="w-9 h-9 text-green-500" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 sm:w-9 sm:h-9 text-green-500" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">翻译完成！</h2>
-                <p className="text-sm text-muted-foreground">
+                <h2 className="text-lg sm:text-xl font-bold text-foreground">翻译完成！</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   共 {files.length} 个文件已翻译完毕
                 </p>
               </motion.div>
@@ -143,7 +143,7 @@ export function TranslationProgress({
               {formatTime(estimatedTimeLeft)}
             </span>
           </div>
-          <div className="relative h-3 rounded-full bg-muted overflow-hidden">
+          <div className="relative h-4 sm:h-3 rounded-full bg-muted overflow-hidden">
             <motion.div
               className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-blue-400"
               initial={{ width: 0 }}
@@ -156,7 +156,7 @@ export function TranslationProgress({
       )}
 
       {/* File list */}
-      <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-[50vh] sm:max-h-[40vh] overflow-y-auto pr-1">
         {files.map((file, i) => {
           const iconConfig = ICON_MAP[file.category] || ICON_MAP.text;
           const Icon = iconConfig.icon;
@@ -240,24 +240,24 @@ export function TranslationProgress({
       </div>
 
       {/* Actions */}
-      <div className="flex justify-center gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3 pt-2">
         {isComplete ? (
           <>
             {onDownloadAll && (
-              <Button onClick={onDownloadAll} className="gap-2 bg-gradient-to-r from-primary to-blue-400 hover:opacity-90">
+              <Button onClick={onDownloadAll} className="gap-2 bg-gradient-to-r from-primary to-blue-400 hover:opacity-90 w-full sm:w-auto min-h-[44px]">
                 <Package className="w-4 h-4" />
                 下载全部
               </Button>
             )}
             {onReset && (
-              <Button variant="outline" onClick={onReset} className="gap-2">
+              <Button variant="outline" onClick={onReset} className="gap-2 w-full sm:w-auto min-h-[44px]">
                 <RotateCcw className="w-4 h-4" />
                 返回首页
               </Button>
             )}
           </>
         ) : (
-          <Button variant="outline" onClick={onCancel} className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive">
+          <Button variant="outline" onClick={onCancel} className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto min-h-[44px]">
             <X className="w-4 h-4" />
             取消翻译
           </Button>

@@ -21,23 +21,23 @@ const Index = () => {
     <div className="min-h-screen bg-mesh-gradient flex flex-col">
       {/* Header */}
       <header className="glass-header border-b border-border/50 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
-              <Languages className="w-5 h-5 text-primary-foreground" />
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+              <Languages className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold text-foreground tracking-tight hidden sm:inline">AI 翻译</span>
+            <span className="text-base sm:text-lg font-bold text-foreground tracking-tight hidden sm:inline">AI 翻译</span>
           </div>
 
           {/* Tabs */}
-          <nav className="flex items-center gap-1 bg-muted/60 rounded-xl p-1">
+          <nav className="flex items-center gap-0.5 sm:gap-1 bg-muted/60 rounded-xl p-0.5 sm:p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                  'relative flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[40px]',
                   activeTab === tab.id
                     ? 'text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
@@ -57,7 +57,7 @@ const Index = () => {
           </nav>
 
           {/* Settings */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <ThemeToggle />
             <ApiKeySettings onKeyChange={() => {}} />
           </div>
@@ -65,9 +65,9 @@ const Index = () => {
       </header>
 
       {/* Main */}
-      <main className="flex-1 flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
+      <main className="flex-1 flex items-start justify-center px-3 sm:px-6 py-4 sm:py-12">
         <div className="w-full max-w-5xl">
-          <div className="card-elevated p-5 sm:p-8">
+          <div className="card-elevated p-3 sm:p-5 md:p-8">
             {activeTab === 'text' ? <TextTranslation /> : <DocumentTranslation />}
           </div>
         </div>
