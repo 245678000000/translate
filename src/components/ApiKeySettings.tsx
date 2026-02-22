@@ -304,7 +304,11 @@ function ProviderForm({
 
   return (
     <div className="space-y-5">
-      {/* ── DeepLX-style header: Icon + Title + Test button ── */}
+      {/* Accessible title for Radix (visually hidden) */}
+      <DialogTitle className="sr-only">{isEdit ? '编辑' : '添加'}提供商</DialogTitle>
+      <DialogDescription className="sr-only">配置翻译服务提供商</DialogDescription>
+
+      {/* ── Header: Icon + Title + Test button ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
